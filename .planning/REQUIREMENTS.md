@@ -85,39 +85,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | TBD | Pending |
-| CFG-02 | TBD | Pending |
-| CFG-03 | TBD | Pending |
-| CFG-04 | TBD | Pending |
-| CFG-05 | TBD | Pending |
-| GPIO-01 | TBD | Pending |
-| GPIO-02 | TBD | Pending |
-| GPIO-03 | TBD | Pending |
-| GPIO-04 | TBD | Pending |
-| GPIO-05 | TBD | Pending |
-| GPIO-06 | TBD | Pending |
-| WEB-01 | TBD | Pending |
-| WEB-02 | TBD | Pending |
-| WEB-03 | TBD | Pending |
-| WEB-04 | TBD | Pending |
-| WEB-05 | TBD | Pending |
-| WEB-06 | TBD | Pending |
-| WEB-07 | TBD | Pending |
-| WEB-08 | TBD | Pending |
-| NET-01 | TBD | Pending |
-| NET-02 | TBD | Pending |
-| NET-03 | TBD | Pending |
-| PRINT-01 | TBD | Pending |
-| PRINT-02 | TBD | Pending |
-| PRINT-03 | TBD | Pending |
-| PRINT-04 | TBD | Pending |
-| PRINT-05 | TBD | Pending |
+| CFG-01 | Phase 2 | Pending |
+| CFG-02 | Phase 2 | Pending |
+| CFG-03 | Phase 2 | Pending |
+| CFG-04 | Phase 2 | Pending |
+| CFG-05 | Phase 2 | Pending |
+| PRINT-01 | Phase 3 | Pending |
+| PRINT-02 | Phase 3 | Pending |
+| PRINT-03 | Phase 3 | Pending |
+| PRINT-04 | Phase 3 | Pending |
+| PRINT-05 | Phase 3 | Pending |
+| GPIO-01 | Phase 4 | Pending |
+| GPIO-02 | Phase 4 | Pending |
+| GPIO-03 | Phase 4 | Pending |
+| GPIO-04 | Phase 4 | Pending |
+| GPIO-05 | Phase 4 | Pending |
+| GPIO-06 | Phase 4 | Pending |
+| WEB-01 | Phase 5 | Pending |
+| WEB-02 | Phase 5 | Pending |
+| WEB-03 | Phase 5 | Pending |
+| WEB-04 | Phase 5 | Pending |
+| WEB-05 | Phase 5 | Pending |
+| WEB-06 | Phase 5 | Pending |
+| WEB-07 | Phase 5 | Pending |
+| WEB-08 | Phase 5 | Pending |
+| NET-01 | Phase 6 | Pending |
+| NET-02 | Phase 6 | Pending |
+| NET-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v0.2 requirements: 27 total
-- Mapped to phases: 0 (awaiting roadmap)
-- Unmapped: 27 ⚠️
+- Mapped to phases: 27 (100%)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 after roadmap creation*
