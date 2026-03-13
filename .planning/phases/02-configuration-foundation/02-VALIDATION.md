@@ -1,9 +1,9 @@
 ---
 phase: 2
 slug: configuration-foundation
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-13
 ---
 
@@ -17,20 +17,20 @@ created: 2026-03-13
 
 | Property | Value |
 |----------|-------|
-| **Framework** | {pytest 7.x / jest 29.x / vitest / go test / other} |
-| **Config file** | {path or "none — Wave 0 installs"} |
-| **Quick run command** | `{quick command}` |
-| **Full suite command** | `{full command}` |
-| **Estimated runtime** | ~{N} seconds |
+| **Framework** | pytest 9.0+ |
+| **Config file** | pytest.ini (exists) |
+| **Quick run command** | `pytest tests/test_config.py -x` |
+| **Full suite command** | `pytest tests/ -v` |
+| **Estimated runtime** | ~3 seconds |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `{quick run command}`
-- **After every plan wave:** Run `{full suite command}`
+- **After every task commit:** Run `pytest tests/test_config.py -x`
+- **After every plan wave:** Run `pytest tests/ -v`
 - **Before `/gsd:verify-work`:** Full suite must be green
-- **Max feedback latency:** {N} seconds
+- **Max feedback latency:** 3 seconds
 
 ---
 
@@ -38,7 +38,11 @@ created: 2026-03-13
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| {N}-01-01 | 01 | 1 | REQ-{XX} | unit | `{command}` | ✅ / ❌ W0 | ⬜ pending |
+| 02-01-01 | 01 | 1 | CFG-01..05 | unit | `grep "pyyaml>=6.0.3" requirements.txt` | ✅ | ⬜ pending |
+| 02-01-02 | 01 | 1 | CFG-01..05 | unit | `pytest tests/test_config.py -v --collect-only \| grep -c "test_" \| grep -E "^12$"` | ❌ W0 | ⬜ pending |
+| 02-02-RED | 02 | 2 | CFG-01..05 | unit | `pytest tests/test_config.py -v` (should fail with ImportError) | ✅ from W1 | ⬜ pending |
+| 02-02-GREEN | 02 | 2 | CFG-01..05 | unit | `pytest tests/test_config.py -v` (should pass 12/12) | ✅ from W1 | ⬜ pending |
+| 02-02-REFACTOR | 02 | 2 | CFG-01..05 | unit | `pytest tests/test_config.py -v` (should pass 12/12) | ✅ from W1 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -46,31 +50,39 @@ created: 2026-03-13
 
 ## Wave 0 Requirements
 
-- [ ] `{tests/test_file.py}` — stubs for REQ-{XX}
-- [ ] `{tests/conftest.py}` — shared fixtures
-- [ ] `{framework install}` — if no framework detected
+- [x] `tests/test_config.py` — 12 test stubs covering CFG-01 through CFG-05 (created by Wave 1 task 02-01-02)
+  - test_load_valid_config
+  - test_missing_config_file
+  - test_invalid_yaml_syntax
+  - test_empty_config_file
+  - test_gpio_enabled_flag
+  - test_web_enabled_flag
+  - test_partial_config_uses_defaults
+  - test_target_file_path
+  - test_path_conversion
+  - test_gpio_pin_number
+  - test_invalid_gpio_pin_range
+  - test_gpio_pin_type_validation
+- [x] `tests/conftest.py` — shared fixtures (exists from Phase 1)
+- [x] pytest 9.0+ — framework installed (exists in requirements.txt)
 
-*If none: "Existing infrastructure covers all phase requirements."*
+**Note:** Wave 1 (plan 02-01) creates test scaffolding. Tests are stubs with `pytest.skip()` markers and verify structure only (12 tests collect successfully). Behavioral verification occurs in Wave 2 (plan 02-02 TDD implementation).
 
 ---
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| {behavior} | REQ-{XX} | {reason} | {steps} |
-
-*If none: "All phase behaviors have automated verification."*
+*All phase behaviors have automated verification.*
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < {N}s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (test scaffold created in Wave 1)
+- [x] No watch-mode flags
+- [x] Feedback latency < 3s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** {pending / approved YYYY-MM-DD}
+**Approval:** approved 2026-03-13
