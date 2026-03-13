@@ -19,7 +19,7 @@ Plans:
 - [x] 01-01-PLAN.md — Foundation setup (requirements, file handler, USB permissions docs)
 - [x] 01-02-PLAN.md — Core implementation (printer module, test infrastructure)
 - [x] 01-03-PLAN.md — CLI integration (entry point, full test suite)
-- [ ] 01-04-PLAN.md — Hardware verification (manual testing with real printer)
+- [x] 01-04-PLAN.md — Hardware verification (manual testing with real printer)
 
 ### Phase 2: Testing and validation
 Test the POC with real print jobs and validate output quality.
