@@ -3,9 +3,11 @@
 This module provides the command-line interface for printing files from the
 /GEN26_BILLPRINTER/ folder (or custom path) to a USB thermal printer.
 
+Supports text files (.txt) and image files (.png, .jpg, .jpeg, .bmp).
+
 Usage:
     python print_job.py receipt.txt
-    python print_job.py receipt.txt --verbose
+    python print_job.py wish1.png --verbose
     python print_job.py receipt.txt --folder /custom/path
 
 Exit codes:
@@ -18,7 +20,7 @@ Exit codes:
 import sys
 import argparse
 from src.file_handler import FileError
-from src.printer import print_text_file, PrinterError
+from src.printer import print_file, PrinterError
 
 
 def parse_args(args=None):
@@ -37,15 +39,15 @@ def parse_args(args=None):
         SystemExit: If arguments are invalid (argparse default behavior)
     """
     parser = argparse.ArgumentParser(
-        description='Print text files to thermal receipt printer',
-        epilog='Example: python print_job.py receipt.txt',
+        description='Print text or image files to thermal receipt printer',
+        epilog='Examples:\n  python print_job.py receipt.txt\n  python print_job.py wish1.png --verbose',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
     parser.add_argument(
         'filename',
         type=str,
-        help='File to print (e.g., receipt.txt). Assumes /GEN26_BILLPRINTER/ unless full path.'
+        help='File to print (.txt, .png, .jpg, .jpeg, .bmp). Assumes /GEN26_BILLPRINTER/ unless full path.'
     )
 
     parser.add_argument(
@@ -73,8 +75,8 @@ def main():
     args = parse_args()
 
     try:
-        # Print file using printer module (which calls file_handler internally)
-        print_text_file(args.filename, args.folder)
+        # Print file using printer module (auto-detects text vs image)
+        print_file(args.filename, args.folder)
 
         if args.verbose:
             print(f"Successfully printed: {args.filename}")
@@ -87,6 +89,10 @@ def main():
 
     except PrinterError as e:
         print(f"Printer error: {e}", file=sys.stderr)
+        return 1
+
+    except ValueError as e:
+        print(f"File type error: {e}", file=sys.stderr)
         return 1
 
     except KeyboardInterrupt:

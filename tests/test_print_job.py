@@ -57,8 +57,8 @@ def test_main_with_valid_file(mocker, capsys):
     """Test main() returns 0 on successful print."""
     from src.print_job import main
 
-    # Mock print_text_file to simulate successful print
-    mock_print = mocker.patch('src.print_job.print_text_file', return_value=0)
+    # Mock print_file to simulate successful print
+    mock_print = mocker.patch('src.print_job.print_file', return_value=0)
 
     # Mock sys.argv for argument parsing
     mocker.patch('sys.argv', ['print_job.py', 'receipt.txt'])
@@ -73,9 +73,9 @@ def test_main_with_file_error(mocker, capsys):
     """Test main() returns 1 and prints error to stderr on FileError."""
     from src.print_job import main
 
-    # Mock print_text_file to raise FileError
+    # Mock print_file to raise FileError
     mock_print = mocker.patch(
-        'src.print_job.print_text_file',
+        'src.print_job.print_file',
         side_effect=FileError("File not found: /GEN26_BILLPRINTER/missing.txt")
     )
 
@@ -96,9 +96,9 @@ def test_main_with_printer_error(mocker, capsys):
     """Test main() returns 1 and prints error to stderr on PrinterError."""
     from src.print_job import main
 
-    # Mock print_text_file to raise PrinterError
+    # Mock print_file to raise PrinterError
     mock_print = mocker.patch(
-        'src.print_job.print_text_file',
+        'src.print_job.print_file',
         side_effect=PrinterError("No printer found")
     )
 
@@ -119,9 +119,9 @@ def test_main_with_keyboard_interrupt(mocker, capsys):
     """Test main() returns 130 and prints 'Interrupted' on KeyboardInterrupt."""
     from src.print_job import main
 
-    # Mock print_text_file to raise KeyboardInterrupt
+    # Mock print_file to raise KeyboardInterrupt
     mock_print = mocker.patch(
-        'src.print_job.print_text_file',
+        'src.print_job.print_file',
         side_effect=KeyboardInterrupt()
     )
 
@@ -141,8 +141,8 @@ def test_main_with_verbose_flag(mocker, capsys):
     """Test main() with --verbose prints success message to stdout."""
     from src.print_job import main
 
-    # Mock print_text_file to simulate successful print
-    mock_print = mocker.patch('src.print_job.print_text_file', return_value=0)
+    # Mock print_file to simulate successful print
+    mock_print = mocker.patch('src.print_job.print_file', return_value=0)
 
     # Mock sys.argv with --verbose
     mocker.patch('sys.argv', ['print_job.py', 'receipt.txt', '--verbose'])

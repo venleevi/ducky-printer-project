@@ -11,8 +11,9 @@ Security notes:
 """
 
 import usb.core
+from pathlib import Path
 from escpos.printer import Usb
-from src.file_handler import read_file
+from src.file_handler import read_file, resolve_filepath
 
 
 class PrinterError(Exception):
@@ -151,3 +152,116 @@ def print_text_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> i
 
     # Print content (PrinterError propagates to caller)
     return print_text(content)
+
+
+def print_image(image_path: str) -> int:
+    """Print image file with per-job connection lifecycle.
+
+    Opens connection, prints image centered on receipt paper, then closes.
+    Supports PNG, JPG, BMP formats via PIL/Pillow (python-escpos dependency).
+
+    Print sequence:
+    1. Open connection
+    2. Feed 1 blank line (top spacing)
+    3. Print image (centered, auto-scaled for receipt width)
+    4. Feed 2 blank lines (bottom spacing)
+    5. Full paper cut
+    6. Close connection
+
+    Args:
+        image_path: Full path to image file (PNG, JPG, BMP)
+
+    Returns:
+        int: 0 on success
+
+    Raises:
+        PrinterError: If USB error occurs, printer unavailable, or image invalid
+
+    Example:
+        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wish1.png")
+        0
+    """
+    printer = find_printer()
+
+    try:
+        # Open connection for this print job
+        printer.open()
+
+        # Add 1 blank line at top
+        printer.feed(1)
+
+        # Print image (python-escpos handles scaling and dithering)
+        # center=True centers image on receipt paper
+        # impl="bitImageColumn" is most compatible with thermal printers
+        printer.image(image_path, center=True, impl="bitImageColumn")
+
+        # Add 2 blank lines at bottom
+        printer.feed(2)
+
+        # Full paper cut
+        printer.cut(mode='FULL')
+
+        return 0
+
+    except usb.core.USBError as e:
+        raise PrinterError(f"USB error: {e}")
+
+    except Exception as e:
+        raise PrinterError(f"Printer error: {e}")
+
+    finally:
+        # Always close connection to prevent resource leaks
+        try:
+            printer.close()
+        except:
+            pass  # Ignore errors on close
+
+
+def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> int:
+    """Print file (text or image) based on file extension.
+
+    Auto-detects file type by extension and routes to appropriate print function:
+    - Text files (.txt): print_text_file()
+    - Image files (.png, .jpg, .jpeg, .bmp): print_image()
+
+    Args:
+        filename: Name of file to print (relative or absolute path)
+        base_folder: Base folder for relative paths (default: /GEN26_BILLPRINTER)
+
+    Returns:
+        int: 0 on success
+
+    Raises:
+        FileError: If file not found or not readable
+        PrinterError: If printing fails
+        ValueError: If file type not supported
+
+    Example:
+        >>> print_file("receipt.txt")
+        0
+
+        >>> print_file("wish1.png")
+        0
+    """
+    # Resolve to full path
+    file_path = resolve_filepath(filename, base_folder)
+
+    # Check file exists
+    if not file_path.exists():
+        from src.file_handler import FileError
+        raise FileError(f"File not found: {file_path}")
+
+    # Determine file type by extension
+    extension = file_path.suffix.lower()
+
+    if extension == '.txt':
+        # Text file - use text printing
+        return print_text_file(filename, base_folder)
+
+    elif extension in ['.png', '.jpg', '.jpeg', '.bmp']:
+        # Image file - use image printing
+        return print_image(str(file_path))
+
+    else:
+        # Unsupported file type
+        raise ValueError(f"Unsupported file type: {extension}. Supported: .txt, .png, .jpg, .jpeg, .bmp")
