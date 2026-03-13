@@ -8,6 +8,10 @@ Supports text files (.txt) and image files (.png, .jpg, .jpeg, .bmp).
 Usage:
     python print_job.py receipt.txt
     python print_job.py wish1.png --verbose
+    python print_job.py wish1.png --rotate --width 8 --height 18
+    python print_job.py wide_image.png --rotate --fit
+    python print_job.py large_image.png --fit
+    python print_job.py large_image.png --scale 25
     python print_job.py receipt.txt --folder /custom/path
 
 Exit codes:
@@ -58,6 +62,48 @@ def parse_args(args=None):
     )
 
     parser.add_argument(
+        '--rotate', '-r',
+        action='store_true',
+        help='Rotate image 90° clockwise for vertical printing (useful for wide images)'
+    )
+
+    parser.add_argument(
+        '--scale', '-s',
+        type=int,
+        default=100,
+        metavar='PERCENT',
+        help='Scale image to percentage of original size (default: 100). E.g., 25 = 1/4 size, 50 = 1/2 size. Ignored if --fit is used.'
+    )
+
+    parser.add_argument(
+        '--fit', '-f',
+        action='store_true',
+        help='Automatically scale image to fit printer width (maintains aspect ratio)'
+    )
+
+    parser.add_argument(
+        '--printer-width',
+        type=int,
+        default=576,
+        metavar='PIXELS',
+        help='Printer width in pixels for --fit scaling (default: 576 for 80mm paper). Common: 384 (58mm), 576 (80mm)'
+    )
+
+    parser.add_argument(
+        '--width',
+        type=float,
+        metavar='CM',
+        help='Target print width in centimeters (e.g., 8.0 for 8cm). Use with --height to set exact dimensions.'
+    )
+
+    parser.add_argument(
+        '--height',
+        type=float,
+        metavar='CM',
+        help='Target print height in centimeters (e.g., 18.0 for 18cm). Use with --width to set exact dimensions.'
+    )
+
+    parser.add_argument(
         '--verbose', '-v',
         action='store_true',
         help='Enable verbose output'
@@ -76,10 +122,28 @@ def main():
 
     try:
         # Print file using printer module (auto-detects text vs image)
-        print_file(args.filename, args.folder)
+        print_file(
+            args.filename,
+            args.folder,
+            rotate=args.rotate,
+            scale_percent=args.scale,
+            fit_width=args.fit,
+            printer_width=args.printer_width,
+            target_width_cm=args.width,
+            target_height_cm=args.height
+        )
 
         if args.verbose:
-            print(f"Successfully printed: {args.filename}")
+            rotation_msg = " (rotated 90°)" if args.rotate else ""
+            if args.width and args.height:
+                scale_msg = f" (target size: {args.width}cm × {args.height}cm, centered)"
+            elif args.fit:
+                scale_msg = f" (fitted to {args.printer_width}px width)"
+            elif args.scale != 100:
+                scale_msg = f" (scaled to {args.scale}%)"
+            else:
+                scale_msg = ""
+            print(f"Successfully printed: {args.filename}{rotation_msg}{scale_msg}")
 
         return 0
 

@@ -13,7 +13,11 @@ Security notes:
 import usb.core
 from pathlib import Path
 from escpos.printer import Usb
+from PIL import Image, ImageOps
 from src.file_handler import read_file, resolve_filepath
+
+# Thermal printer resolution: 72 pixels per cm (for 576px width on 8cm paper)
+PIXELS_PER_CM = 72
 
 
 class PrinterError(Exception):
@@ -163,7 +167,7 @@ def print_text_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> i
     return print_text(content)
 
 
-def print_image(image_path: str) -> int:
+def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = None, target_height_cm: float = None) -> int:
     """Print image file with per-job connection lifecycle.
 
     Opens connection, prints image centered on receipt paper, then closes.
@@ -172,13 +176,27 @@ def print_image(image_path: str) -> int:
     Print sequence:
     1. Open connection
     2. Add 1 blank line (top spacing)
-    3. Print image (centered, auto-scaled for receipt width)
-    4. Add 2 blank lines (bottom spacing)
-    5. Full paper cut
-    6. Close connection
+    3. Optionally rotate image 90° clockwise (for wide images)
+    4. Optionally scale image (fit to printer width, target dimensions, or manual percentage)
+    5. Center image with padding if target dimensions specified
+    6. Print image (centered, auto-scaled for receipt width)
+    7. Add 2 blank lines (bottom spacing)
+    8. Full paper cut
+    9. Close connection
 
     Args:
         image_path: Full path to image file (PNG, JPG, BMP)
+        rotate: If True, rotate image 90° clockwise for vertical printing (default: False)
+        scale_percent: Scale image to percentage of original size (default: 100)
+                       e.g., 25 = 25% (1/4 size), 50 = 50% (1/2 size)
+                       Ignored if fit_width=True or target dimensions set
+        fit_width: If True, automatically scale image to fit printer width (default: False)
+                   Ignored if target dimensions set
+        printer_width: Printer width in pixels for fit_width scaling (default: 576 for 80mm paper)
+                       Common values: 384 (58mm), 576 (80mm)
+        target_width_cm: Target width in centimeters (e.g., 8.0 for 8cm)
+        target_height_cm: Target height in centimeters (e.g., 18.0 for 18cm)
+                         If both target dimensions set, image is scaled to fit and centered with padding
 
     Returns:
         int: 0 on success
@@ -189,8 +207,18 @@ def print_image(image_path: str) -> int:
     Example:
         >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wish1.png")
         0
+
+        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wide.png", rotate=True)
+        0
+
+        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/large.png", fit_width=True)
+        0
+
+        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wish1.png", rotate=True, target_width_cm=8, target_height_cm=18)
+        0
     """
     printer = find_printer()
+    temp_path = None
 
     try:
         # Open connection for this print job
@@ -199,10 +227,59 @@ def print_image(image_path: str) -> int:
         # Add 1 blank line at top (using ln() instead of feed())
         printer.ln(1)
 
+        # Handle image transformations if requested
+        actual_image_path = image_path
+        if target_width_cm or target_height_cm or fit_width or scale_percent != 100 or rotate:
+            # Load image
+            img = Image.open(image_path)
+
+            # Rotate first if needed (affects dimensions for scaling calculations)
+            if rotate:
+                img = img.rotate(-90, expand=True)  # -90 = clockwise
+
+            # Scale and center image based on target dimensions
+            if target_width_cm and target_height_cm:
+                # Convert cm to pixels
+                target_width_px = int(target_width_cm * PIXELS_PER_CM)
+                target_height_px = int(target_height_cm * PIXELS_PER_CM)
+
+                # Scale image to fit within target dimensions while maintaining aspect ratio
+                img.thumbnail((target_width_px, target_height_px), Image.LANCZOS)
+
+                # Create white canvas with target dimensions
+                canvas = Image.new('RGB', (target_width_px, target_height_px), 'white')
+
+                # Calculate position to center image on canvas
+                x_offset = (target_width_px - img.width) // 2
+                y_offset = (target_height_px - img.height) // 2
+
+                # Paste image centered on canvas
+                canvas.paste(img, (x_offset, y_offset))
+                img = canvas
+
+            elif fit_width:
+                # Automatically scale to fit printer width while maintaining aspect ratio
+                if img.width > printer_width:
+                    scale_factor = printer_width / img.width
+                    new_width = printer_width
+                    new_height = int(img.height * scale_factor)
+                    img = img.resize((new_width, new_height), Image.LANCZOS)
+            elif scale_percent != 100:
+                # Manual percentage scaling
+                scale_factor = scale_percent / 100.0
+                new_width = int(img.width * scale_factor)
+                new_height = int(img.height * scale_factor)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+
+            # Save to temp file with same extension
+            temp_path = Path(image_path).parent / f".temp_processed_{Path(image_path).name}"
+            img.save(temp_path)
+            actual_image_path = str(temp_path)
+
         # Print image (python-escpos handles scaling and dithering)
         # center=True centers image on receipt paper
         # impl="bitImageColumn" is most compatible with thermal printers
-        printer.image(image_path, center=True, impl="bitImageColumn")
+        printer.image(actual_image_path, center=True, impl="bitImageColumn")
 
         # Add 2 blank lines at bottom (using ln() instead of feed())
         printer.ln(2)
@@ -219,6 +296,13 @@ def print_image(image_path: str) -> int:
         raise PrinterError(f"Printer error: {e}")
 
     finally:
+        # Clean up temp processed image if created
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except:
+                pass
+
         # Always close connection to prevent resource leaks
         try:
             printer.close()
@@ -226,7 +310,7 @@ def print_image(image_path: str) -> int:
             pass  # Ignore errors on close
 
 
-def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> int:
+def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER", rotate: bool = False, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = None, target_height_cm: float = None) -> int:
     """Print file (text or image) based on file extension.
 
     Auto-detects file type by extension and routes to appropriate print function:
@@ -236,6 +320,12 @@ def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> int:
     Args:
         filename: Name of file to print (relative or absolute path)
         base_folder: Base folder for relative paths (default: /GEN26_BILLPRINTER)
+        rotate: If True, rotate images 90° clockwise for vertical printing (default: False)
+        scale_percent: Scale images to percentage of original size (default: 100)
+        fit_width: If True, automatically scale images to fit printer width (default: False)
+        printer_width: Printer width in pixels for fit_width scaling (default: 576)
+        target_width_cm: Target width in centimeters for images (e.g., 8.0)
+        target_height_cm: Target height in centimeters for images (e.g., 18.0)
 
     Returns:
         int: 0 on success
@@ -250,6 +340,12 @@ def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> int:
         0
 
         >>> print_file("wish1.png")
+        0
+
+        >>> print_file("wide.png", rotate=True, fit_width=True)
+        0
+
+        >>> print_file("wish1.png", rotate=True, target_width_cm=8, target_height_cm=18)
         0
     """
     # Resolve to full path
@@ -269,7 +365,7 @@ def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> int:
 
     elif extension in ['.png', '.jpg', '.jpeg', '.bmp']:
         # Image file - use image printing
-        return print_image(str(file_path))
+        return print_image(str(file_path), rotate=rotate, scale_percent=scale_percent, fit_width=fit_width, printer_width=printer_width, target_width_cm=target_width_cm, target_height_cm=target_height_cm)
 
     else:
         # Unsupported file type
