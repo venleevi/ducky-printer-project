@@ -1,7 +1,7 @@
 # Thermal printer ESC/POS control library
 # Provides USB printer communication, command generation, and image processing
 # Automatically includes pyusb (USB backend) and Pillow (image support) as dependencies
-python-escpos>=3.2
+python-escpos>=3.0
 
 # Testing framework for automated unit and integration tests
 pytest>=9.0
