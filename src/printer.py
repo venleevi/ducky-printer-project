@@ -28,6 +28,9 @@ def find_printer():
     without requiring hard-coded vendor/product IDs. This approach works
     across multiple printer models and is more robust to device changes.
 
+    Explicitly specifies USB endpoints (in_ep=0x81, out_ep=0x02) which
+    is required for some thermal printers like Citizen CT-S310IIEBK.
+
     Returns:
         Usb: python-escpos printer instance ready for operations
 
@@ -56,7 +59,13 @@ def find_printer():
         return False
 
     try:
-        printer = Usb(usb_args={'custom_match': match_printer_class})
+        # Create printer with explicit endpoints (required for some models)
+        # in_ep=0x81 (bulk IN), out_ep=0x02 (bulk OUT)
+        printer = Usb(
+            usb_args={'custom_match': match_printer_class},
+            in_ep=0x81,
+            out_ep=0x02
+        )
         return printer
     except Exception as e:
         raise PrinterError(f"No printer found: {e}")
@@ -95,14 +104,14 @@ def print_text(content: str) -> int:
         # Open connection for this print job
         printer.open()
 
-        # Add 1 blank line at top
-        printer.feed(1)
+        # Add 1 blank line at top (using ln() for line feed)
+        printer.ln(1)
 
         # Print content (python-escpos handles UTF-8 encoding)
         printer.text(content)
 
-        # Add 2 blank lines at bottom
-        printer.feed(2)
+        # Add 2 blank lines at bottom (using ln() for line feed)
+        printer.ln(2)
 
         # Full paper cut
         printer.cut(mode='FULL')
@@ -162,9 +171,9 @@ def print_image(image_path: str) -> int:
 
     Print sequence:
     1. Open connection
-    2. Feed 1 blank line (top spacing)
+    2. Add 1 blank line (top spacing)
     3. Print image (centered, auto-scaled for receipt width)
-    4. Feed 2 blank lines (bottom spacing)
+    4. Add 2 blank lines (bottom spacing)
     5. Full paper cut
     6. Close connection
 
@@ -187,16 +196,16 @@ def print_image(image_path: str) -> int:
         # Open connection for this print job
         printer.open()
 
-        # Add 1 blank line at top
-        printer.feed(1)
+        # Add 1 blank line at top (using ln() instead of feed())
+        printer.ln(1)
 
         # Print image (python-escpos handles scaling and dithering)
         # center=True centers image on receipt paper
         # impl="bitImageColumn" is most compatible with thermal printers
         printer.image(image_path, center=True, impl="bitImageColumn")
 
-        # Add 2 blank lines at bottom
-        printer.feed(2)
+        # Add 2 blank lines at bottom (using ln() instead of feed())
+        printer.ln(2)
 
         # Full paper cut
         printer.cut(mode='FULL')
