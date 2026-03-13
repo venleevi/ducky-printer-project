@@ -99,12 +99,17 @@ class TestPrintText:
         """Test print_text() closes connection and raises PrinterError on USB error."""
         mocker.patch('src.printer.find_printer', return_value=mock_printer)
 
-        # Mock usb.core module and USBError
-        usb_core_mock = mocker.patch('src.printer.usb')
-        usb_error = Exception("USB communication error")
-        usb_error.__class__.__name__ = 'USBError'
+        # Create a proper USBError exception class
+        class USBError(Exception):
+            pass
+
+        # Mock usb.core module with USBError
+        mock_usb_module = mocker.MagicMock()
+        mock_usb_module.USBError = USBError
+        mocker.patch('src.printer.usb.core', mock_usb_module)
 
         # Make text() raise USB error
+        usb_error = USBError("USB communication error")
         mock_printer.text.side_effect = usb_error
 
         with pytest.raises(PrinterError) as exc_info:
