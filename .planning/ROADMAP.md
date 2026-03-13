@@ -16,7 +16,7 @@ Build core functionality to detect and print files from the USB stick folder to 
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Foundation setup (requirements, file handler, USB permissions docs)
+- [x] 01-01-PLAN.md — Foundation setup (requirements, file handler, USB permissions docs)
 - [ ] 01-02-PLAN.md — Core implementation (printer module, test infrastructure)
 - [ ] 01-03-PLAN.md — CLI integration (entry point, full test suite)
 - [ ] 01-04-PLAN.md — Hardware verification (manual testing with real printer)
