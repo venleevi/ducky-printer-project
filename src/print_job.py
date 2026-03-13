@@ -1,7 +1,7 @@
 """CLI entry point for thermal printer job execution.
 
 This module provides the command-line interface for printing files from the
-/GEN26_BILLPRINTER/ folder (or custom path) to a USB thermal printer.
+/home/admin/ducky-printer-project/print_files/ folder (or custom path) to a USB thermal printer.
 
 Supports text files (.txt) and image files (.png, .jpg, .jpeg, .bmp).
 
@@ -51,14 +51,14 @@ def parse_args(args=None):
     parser.add_argument(
         'filename',
         type=str,
-        help='File to print (.txt, .png, .jpg, .jpeg, .bmp). Assumes /GEN26_BILLPRINTER/ unless full path.'
+        help='File to print (.txt, .png, .jpg, .jpeg, .bmp). Assumes /home/admin/ducky-printer-project/print_files/ unless full path.'
     )
 
     parser.add_argument(
         '--folder',
         type=str,
-        default='/GEN26_BILLPRINTER',
-        help='Base folder path (default: /GEN26_BILLPRINTER)'
+        default='/home/admin/ducky-printer-project/print_files',
+        help='Base folder path (default: /home/admin/ducky-printer-project/print_files)'
     )
 
     parser.add_argument(
@@ -136,7 +136,7 @@ def main():
         if args.verbose:
             rotation_msg = " (rotated 90°)" if args.rotate else ""
             if args.width and args.height:
-                scale_msg = f" (target size: {args.width}cm × {args.height}cm, centered)"
+                scale_msg = f" (scaled to fit {args.width}cm × {args.height}cm)"
             elif args.fit:
                 scale_msg = f" (fitted to {args.printer_width}px width)"
             elif args.scale != 100:

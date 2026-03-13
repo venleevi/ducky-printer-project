@@ -83,11 +83,9 @@ def print_text(content: str) -> int:
 
     Print sequence:
     1. Open connection
-    2. Feed 1 blank line (top spacing)
-    3. Print content (UTF-8 via python-escpos MagicEncode)
-    4. Feed 2 blank lines (bottom spacing)
-    5. Full paper cut
-    6. Close connection
+    2. Print content (UTF-8 via python-escpos MagicEncode)
+    3. Full paper cut (no spacing)
+    4. Close connection
 
     Args:
         content: Text content to print (UTF-8 string)
@@ -108,16 +106,10 @@ def print_text(content: str) -> int:
         # Open connection for this print job
         printer.open()
 
-        # Add 1 blank line at top (using ln() for line feed)
-        printer.ln(1)
-
         # Print content (python-escpos handles UTF-8 encoding)
         printer.text(content)
 
-        # Add 2 blank lines at bottom (using ln() for line feed)
-        printer.ln(2)
-
-        # Full paper cut
+        # Full paper cut (no spacing)
         printer.cut(mode='FULL')
 
         return 0
@@ -136,7 +128,7 @@ def print_text(content: str) -> int:
             pass  # Ignore errors on close
 
 
-def print_text_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> int:
+def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files") -> int:
     """Read text file and print its content.
 
     Reads file via file_handler module (handles UTF-8 validation and errors),
@@ -144,7 +136,7 @@ def print_text_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER") -> i
 
     Args:
         filename: Name of file to print (relative or absolute path)
-        base_folder: Base folder for relative paths (default: /GEN26_BILLPRINTER)
+        base_folder: Base folder for relative paths (default: /home/admin/ducky-printer-project/print_files)
 
     Returns:
         int: 0 on success
@@ -175,14 +167,12 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
 
     Print sequence:
     1. Open connection
-    2. Add 1 blank line (top spacing)
-    3. Optionally rotate image 90° clockwise (for wide images)
-    4. Optionally scale image (fit to printer width, target dimensions, or manual percentage)
-    5. Center image with padding if target dimensions specified
-    6. Print image (centered, auto-scaled for receipt width)
-    7. Add 2 blank lines (bottom spacing)
-    8. Full paper cut
-    9. Close connection
+    2. Optionally rotate image 90° clockwise (for wide images)
+    3. Optionally scale image (fit to printer width, target dimensions, or manual percentage)
+    4. Center image with white padding if target dimensions specified
+    5. Print image (centered with padding when using target dimensions)
+    6. Full paper cut (no spacing)
+    7. Close connection
 
     Args:
         image_path: Full path to image file (PNG, JPG, BMP)
@@ -196,7 +186,7 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
                        Common values: 384 (58mm), 576 (80mm)
         target_width_cm: Target width in centimeters (e.g., 8.0 for 8cm)
         target_height_cm: Target height in centimeters (e.g., 18.0 for 18cm)
-                         If both target dimensions set, image is scaled to fit and centered with padding
+                         If both set, image is scaled to fit and centered with white padding
 
     Returns:
         int: 0 on success
@@ -205,16 +195,16 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
         PrinterError: If USB error occurs, printer unavailable, or image invalid
 
     Example:
-        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wish1.png")
+        >>> print_image("/media/admin/KINGSTON/home/admin/ducky-printer-project/print_files/wish1.png")
         0
 
-        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wide.png", rotate=True)
+        >>> print_image("/media/admin/KINGSTON/home/admin/ducky-printer-project/print_files/wide.png", rotate=True)
         0
 
-        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/large.png", fit_width=True)
+        >>> print_image("/media/admin/KINGSTON/home/admin/ducky-printer-project/print_files/large.png", fit_width=True)
         0
 
-        >>> print_image("/media/admin/KINGSTON/GEN26_BILLPRINTER/wish1.png", rotate=True, target_width_cm=8, target_height_cm=18)
+        >>> print_image("/media/admin/KINGSTON/home/admin/ducky-printer-project/print_files/wish1.png", rotate=True, target_width_cm=8, target_height_cm=18)
         0
     """
     printer = find_printer()
@@ -223,9 +213,6 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
     try:
         # Open connection for this print job
         printer.open()
-
-        # Add 1 blank line at top (using ln() instead of feed())
-        printer.ln(1)
 
         # Handle image transformations if requested
         actual_image_path = image_path
@@ -237,7 +224,7 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
             if rotate:
                 img = img.rotate(-90, expand=True)  # -90 = clockwise
 
-            # Scale and center image based on target dimensions
+            # Scale image based on target dimensions
             if target_width_cm and target_height_cm:
                 # Convert cm to pixels
                 target_width_px = int(target_width_cm * PIXELS_PER_CM)
@@ -246,14 +233,10 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
                 # Scale image to fit within target dimensions while maintaining aspect ratio
                 img.thumbnail((target_width_px, target_height_px), Image.LANCZOS)
 
-                # Create white canvas with target dimensions
+                # Center image on white canvas with target dimensions
                 canvas = Image.new('RGB', (target_width_px, target_height_px), 'white')
-
-                # Calculate position to center image on canvas
                 x_offset = (target_width_px - img.width) // 2
                 y_offset = (target_height_px - img.height) // 2
-
-                # Paste image centered on canvas
                 canvas.paste(img, (x_offset, y_offset))
                 img = canvas
 
@@ -277,14 +260,11 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
             actual_image_path = str(temp_path)
 
         # Print image (python-escpos handles scaling and dithering)
-        # center=True centers image on receipt paper
+        # center=True centers image horizontally on paper width
         # impl="bitImageColumn" is most compatible with thermal printers
         printer.image(actual_image_path, center=True, impl="bitImageColumn")
 
-        # Add 2 blank lines at bottom (using ln() instead of feed())
-        printer.ln(2)
-
-        # Full paper cut
+        # Full paper cut (no spacing)
         printer.cut(mode='FULL')
 
         return 0
@@ -310,7 +290,7 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
             pass  # Ignore errors on close
 
 
-def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER", rotate: bool = False, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = None, target_height_cm: float = None) -> int:
+def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = False, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = None, target_height_cm: float = None) -> int:
     """Print file (text or image) based on file extension.
 
     Auto-detects file type by extension and routes to appropriate print function:
@@ -319,7 +299,7 @@ def print_file(filename: str, base_folder: str = "/GEN26_BILLPRINTER", rotate: b
 
     Args:
         filename: Name of file to print (relative or absolute path)
-        base_folder: Base folder for relative paths (default: /GEN26_BILLPRINTER)
+        base_folder: Base folder for relative paths (default: /home/admin/ducky-printer-project/print_files)
         rotate: If True, rotate images 90° clockwise for vertical printing (default: False)
         scale_percent: Scale images to percentage of original size (default: 100)
         fit_width: If True, automatically scale images to fit printer width (default: False)

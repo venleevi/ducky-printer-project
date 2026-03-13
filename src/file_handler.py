@@ -1,7 +1,7 @@
 """File handler module for reading text files from USB stick folder.
 
 This module provides functionality to read text files with UTF-8 encoding
-from the /GEN26_BILLPRINTER/ folder (default) or from absolute paths.
+from the /home/admin/ducky-printer-project/print_files/ folder (default) or from absolute paths.
 
 Security notes:
 - Uses pathlib.Path for secure path manipulation (no string concatenation)
@@ -20,7 +20,7 @@ class FileError(Exception):
 
 def resolve_filepath(
     filename: str,
-    base_folder: str = "/GEN26_BILLPRINTER"
+    base_folder: str = "/home/admin/ducky-printer-project/print_files"
 ) -> Path:
     """Resolve a filename to a full Path object.
 
@@ -29,14 +29,14 @@ def resolve_filepath(
 
     Args:
         filename: The filename or path to resolve
-        base_folder: The base folder to use for relative paths (default: /GEN26_BILLPRINTER)
+        base_folder: The base folder to use for relative paths (default: /home/admin/ducky-printer-project/print_files)
 
     Returns:
         Path object representing the full file path
 
     Examples:
         >>> resolve_filepath("receipt.txt")
-        PosixPath('/GEN26_BILLPRINTER/receipt.txt')
+        PosixPath('/home/admin/ducky-printer-project/print_files/receipt.txt')
 
         >>> resolve_filepath("/full/path/receipt.txt")
         PosixPath('/full/path/receipt.txt')
@@ -53,7 +53,7 @@ def resolve_filepath(
 
 def read_file(
     filename: str,
-    base_folder: str = "/GEN26_BILLPRINTER"
+    base_folder: str = "/home/admin/ducky-printer-project/print_files"
 ) -> str:
     """Read a text file with UTF-8 encoding.
 
@@ -62,7 +62,7 @@ def read_file(
 
     Args:
         filename: The filename or path to read
-        base_folder: The base folder to use for relative paths (default: /GEN26_BILLPRINTER)
+        base_folder: The base folder to use for relative paths (default: /home/admin/ducky-printer-project/print_files)
 
     Returns:
         The file content as a UTF-8 decoded string
