@@ -36,9 +36,14 @@ Proof of concept for automated thermal receipt printing from files stored on a U
 - ✅ Print file contents to thermal printer — UTF-8 text and images both working
 - ✅ Handle basic error cases (printer offline, no files, etc.) — clear error messages, proper exit codes
 
-### Next Milestone Goals
+### Active (v0.2)
 
-*(To be defined in next milestone planning)*
+Currently building:
+- [ ] Physical button trigger for printing (GPIO-based)
+- [ ] Web interface trigger via WiFi-hosted page
+- [ ] Raspberry Pi WiFi access point configuration
+- [ ] Configuration system to enable/disable triggers
+- [ ] Hardcoded printing of wish1.png file
 
 ## Key Decisions
 
@@ -58,4 +63,4 @@ Proof of concept for automated thermal receipt printing from files stored on a U
 
 ---
 
-*Last updated: 2026-03-13 after v0.1 milestone*
+*Last updated: 2026-03-13 after starting v0.2 milestone*
