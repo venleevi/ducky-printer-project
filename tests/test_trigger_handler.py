@@ -36,7 +36,8 @@ class TestHandlePrintTriggerSuccess:
             mock_print.return_value = 0
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('INFO', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert
             assert result is True
@@ -101,7 +102,8 @@ class TestHandlePrintTriggerNoFiles:
             mock_select.return_value = None  # No files available
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('WARNING', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert
             assert result is False
@@ -126,7 +128,8 @@ class TestHandlePrintTriggerPrinterErrors:
             mock_print.side_effect = PrinterError(error_msg)
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('ERROR', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert - GPIO-05: Does NOT crash, returns False
             assert result is False
@@ -145,7 +148,8 @@ class TestHandlePrintTriggerPrinterErrors:
             mock_print.side_effect = FileError(error_msg)
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('ERROR', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert - GPIO-05: Does NOT crash, returns False
             assert result is False
@@ -164,7 +168,8 @@ class TestHandlePrintTriggerPrinterErrors:
             mock_print.side_effect = ValueError(error_msg)
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('ERROR', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert - GPIO-05: Does NOT crash, returns False
             assert result is False
@@ -185,7 +190,8 @@ class TestHandlePrintTriggerFileSelectionErrors:
             mock_select.side_effect = FileNotFoundError(error_msg)
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('ERROR', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert - GPIO-05: Does NOT crash, returns False
             assert result is False
@@ -206,7 +212,8 @@ class TestHandlePrintTriggerUnexpectedErrors:
             mock_select.side_effect = RuntimeError(error_msg)
 
             # Act
-            result = handle_print_trigger(config)
+            with caplog.at_level('ERROR', logger='src.trigger_handler'):
+                result = handle_print_trigger(config)
 
             # Assert - GPIO-05: Does NOT crash, returns False
             assert result is False
