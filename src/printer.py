@@ -242,11 +242,11 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
 
             elif fit_width:
                 # Automatically scale to fit printer width while maintaining aspect ratio
-                if img.width > printer_width:
-                    scale_factor = printer_width / img.width
-                    new_width = printer_width
-                    new_height = int(img.height * scale_factor)
-                    img = img.resize((new_width, new_height), Image.LANCZOS)
+                # Scale both up and down to always fill width (no gaps)
+                scale_factor = printer_width / img.width
+                new_width = printer_width
+                new_height = int(img.height * scale_factor)
+                img = img.resize((new_width, new_height), Image.LANCZOS)
             elif scale_percent != 100:
                 # Manual percentage scaling
                 scale_factor = scale_percent / 100.0

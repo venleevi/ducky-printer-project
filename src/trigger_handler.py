@@ -59,8 +59,7 @@ def handle_print_trigger(config: PrinterConfig) -> bool:
                 filename=str(file_path),
                 base_folder=str(file_path.parent),
                 rotate=True,
-                target_width_cm=8.0,
-                target_height_cm=18.0
+                fit_width=True
             )
             logger.info(f"Print triggered successfully: {file_path}")
             return True
