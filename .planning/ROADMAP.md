@@ -87,11 +87,10 @@ Plans:
   2. Flipping a GPIO-connected switch triggers printing based on the configured transition direction (both, on_only, or off_only)
   3. Rapid button presses within the cooldown period result in only one print job
   4. Electrical noise from button bounce does not produce false triggers
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01: TBD
-
+- [ ] 05-01-PLAN.md — GPIO listener with button/switch modes, hardware debounce (10ms), and cooldown enforcement using gpiozero
 ### Phase 6: Service Deployment
 **Goal**: The GPIO listener runs unattended on boot with proper logging and USB driver configuration
 **Depends on**: Phase 5 (GPIO listener is the service entry point)
