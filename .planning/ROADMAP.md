@@ -33,7 +33,7 @@
 - [x] **Phase 3: File Selection** - Random file picker from configurable source folder with type filtering (COMPLETE 2026-03-19)
 - [x] **Phase 4: Trigger Handler** - Integration seam between event sources and print pipeline with error resilience (completed 2026-03-19)
 - [x] **Phase 5: GPIO Listener** - Button and switch mode GPIO input with debounce and cooldown (completed 2026-03-19)
-- [ ] **Phase 6: Service Deployment** - systemd service, usblp blacklist, journald logging
+- [x] **Phase 6: Service Deployment** - systemd service, usblp blacklist, journald logging (completed 2026-03-19)
 
 ## Phase Details
 
@@ -116,7 +116,7 @@ Plans:
 | 3. File Selection | v0.2 | Complete    | 2026-03-19 | 2026-03-19 |
 | 4. Trigger Handler | v0.2 | Complete    | 2026-03-19 | - |
 | 5. GPIO Listener | v0.2 | Complete    | 2026-03-19 | - |
-| 6. Service Deployment | v0.2 | 0/? | Not started | - |
+| 6. Service Deployment | v0.2 | Complete    | 2026-03-19 | - |
 
 ---
 
