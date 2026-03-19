@@ -58,12 +58,12 @@ Plans:
 **Requirements**: FILE-01, FILE-02, FILE-03
 **Success Criteria** (what must be TRUE):
   1. Each activation selects a random file from the configured source folder
-  2. Only supported file types (.txt, .png, .jpg, .bmp) are considered for selection
+  2. Only supported file types (.txt, .png, .jpg, .jpeg, .bmp) are considered for selection
   3. Empty source folder or folder with no supported files logs a warning instead of crashing
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md — Random file selector with pathlib filtering, case-insensitive extension matching, and graceful empty folder handling
 
 ### Phase 4: Trigger Handler
 **Goal**: A single integration point orchestrates file selection and printing, handling all errors gracefully without crashing the daemon
@@ -114,7 +114,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
 | 2. Configuration Foundation | v0.2 | 2/2 | Complete | 2026-03-19 |
-| 3. File Selection | v0.2 | 0/? | Not started | - |
+| 3. File Selection | v0.2 | 0/1 | Not started | - |
 | 4. Trigger Handler | v0.2 | 0/? | Not started | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
 | 6. Service Deployment | v0.2 | 0/? | Not started | - |
@@ -122,4 +122,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-19 (Phase 2 complete — all plans delivered, 35 tests passing)*
+*Last updated: 2026-03-19 (Phase 3 planned — 1 TDD plan for file selector with 14 tests)*
