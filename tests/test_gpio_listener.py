@@ -54,7 +54,6 @@ def test_button_mode_passes_config_to_handler(mocker):
     config = PrinterConfig(
         gpio_pin=22,
         trigger_mode="press",
-        source_folder=Path("test_folder"),
         cooldown_seconds=0.0
     )
 
@@ -65,7 +64,7 @@ def test_button_mode_passes_config_to_handler(mocker):
     # Verify config passed to handle_print_trigger
     called_config = mock_handle.call_args[0][0]
     assert called_config.gpio_pin == 22
-    assert called_config.source_folder == Path("test_folder")
+    assert called_config.source_folder == Path("print_files")
 
 
 def test_button_mode_uses_hardware_debounce(mocker):
@@ -115,6 +114,10 @@ def test_switch_mode_both_direction_triggers_on_both_edges(mocker):
 def test_switch_mode_on_only_direction_triggers_on_rising_edge_only(mocker):
     """Test that switch_direction='on_only' triggers only on rising edge."""
     mock_switch = MagicMock()
+    # Pre-set callbacks to None so we can test which ones get set
+    mock_switch.when_activated = None
+    mock_switch.when_deactivated = None
+
     mock_handle = mocker.patch('src.gpio_listener.handle_print_trigger', return_value=True)
     mocker.patch('src.gpio_listener.InputDevice', return_value=mock_switch)
     mocker.patch('src.gpio_listener.LGPIOFactory')
@@ -140,6 +143,10 @@ def test_switch_mode_on_only_direction_triggers_on_rising_edge_only(mocker):
 def test_switch_mode_off_only_direction_triggers_on_falling_edge_only(mocker):
     """Test that switch_direction='off_only' triggers only on falling edge."""
     mock_switch = MagicMock()
+    # Pre-set callbacks to None so we can test which ones get set
+    mock_switch.when_activated = None
+    mock_switch.when_deactivated = None
+
     mock_handle = mocker.patch('src.gpio_listener.handle_print_trigger', return_value=True)
     mocker.patch('src.gpio_listener.InputDevice', return_value=mock_switch)
     mocker.patch('src.gpio_listener.LGPIOFactory')
@@ -440,8 +447,7 @@ def test_config_passed_to_callback_is_loaded_config(mocker):
     config = PrinterConfig(
         gpio_pin=25,
         trigger_mode="press",
-        cooldown_seconds=1.5,
-        source_folder=Path("custom_folder")
+        cooldown_seconds=1.5
     )
 
     listener = start_gpio_listener(config)
@@ -452,4 +458,4 @@ def test_config_passed_to_callback_is_loaded_config(mocker):
     called_config = mock_handle.call_args[0][0]
     assert called_config.gpio_pin == 25
     assert called_config.cooldown_seconds == 1.5
-    assert called_config.source_folder == Path("custom_folder")
+    assert called_config.source_folder == Path("print_files")
