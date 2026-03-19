@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: GPIO Print Trigger
-status: unknown
-stopped_at: Completed Phase 04 Plan 01 (Trigger Handler)
-last_updated: "2026-03-19T20:06:01.865Z"
+status: in_progress
+stopped_at: Completed Phase 05 Plan 01 (GPIO Listener)
+last_updated: "2026-03-19T22:16:13Z"
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 4
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -22,8 +22,9 @@ progress:
 
 ## Current Position
 
-Phase: 04 (trigger-handler) — COMPLETE
-Next Phase: 05 (gpio-listener) — READY TO START
+Phase: 05 (gpio-listener) — IN PROGRESS
+Current Plan: 01/01
+Next Phase: 06 (systemd-service) — READY TO START
 
 ## Completed Milestones
 
@@ -69,6 +70,17 @@ Next Phase: 05 (gpio-listener) — READY TO START
 - Default print settings (rotate=True, 8x18cm) for consistent output
 - 9 tests covering all error paths and success scenarios (all passing)
 
+### Phase 05 Complete (2026-03-19)
+
+- GPIO listener with button/switch modes using gpiozero 2.0
+- Hardware debounce: 10ms bounce_time for mechanical button reliability
+- Cooldown enforcement: module-level _last_trigger_time prevents rapid-press spam
+- Switch direction configuration: both/on_only/off_only edge filtering
+- LGPIOFactory for Pi 3B+ compatibility (gpiozero issue #1090)
+- Error resilience: try-except wrapper never crashes listener
+- ImportError fallback allows testing on non-Pi systems
+- 20 tests covering all GPIO behaviors (all passing)
+
 ## Performance Metrics
 
 ### v0.1 POC (Complete)
@@ -90,10 +102,12 @@ Next Phase: 05 (gpio-listener) — READY TO START
 | 02 | 02 | 50m | 4 | 1 | 2026-03-19 |
 | 03 | 01 | 3m | 2 | 2 | 2026-03-19 |
 | 04 | 01 | 4m | 2 | 2 | 2026-03-19 |
+| 05 | 01 | 6m | 2 | 2 | 2026-03-19 |
 
 **Phase 02 Total Duration:** ~95 minutes
 **Phase 03 Total Duration:** ~3 minutes
 **Phase 04 Total Duration:** ~4 minutes
+**Phase 05 Total Duration:** ~6 minutes
 
 ## Blockers/Concerns
 
@@ -102,11 +116,11 @@ Next Phase: 05 (gpio-listener) — READY TO START
 
 ## Session Continuity
 
-**Last session:** 2026-03-19 20:04 UTC
-**Stopped at:** Completed Phase 04 Plan 01 (Trigger Handler)
-**Next Action**: Plan Phase 5 (GPIO Listener) - button/switch event handling with gpiozero
+**Last session:** 2026-03-19 22:16 UTC
+**Stopped at:** Completed Phase 05 Plan 01 (GPIO Listener)
+**Next Action**: Plan Phase 6 (systemd Service) - main loop with GPIO listener integration
 
 ---
 
 *State initialized: 2026-03-13*
-*Last updated: 2026-03-19 after Phase 04 completion*
+*Last updated: 2026-03-19 after Phase 05 Plan 01 completion*
