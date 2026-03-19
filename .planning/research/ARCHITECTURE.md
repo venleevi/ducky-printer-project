@@ -1,437 +1,409 @@
 # Architecture Research
 
-**Domain:** GPIO and Web Trigger Integration for Thermal Printer
-**Researched:** 2026-03-13
+**Domain:** GPIO Print Trigger Integration for Thermal Printer
+**Researched:** 2026-03-19
 **Confidence:** HIGH
 
-## Standard Architecture
-
-### System Overview
+## System Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                      Trigger Layer (v0.2)                         │
-├──────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐              ┌─────────────────────────┐   │
-│  │  GPIO Listener   │              │  Flask Web Server       │   │
-│  │  (gpiozero)      │              │  (HTTP interface)       │   │
-│  └────────┬─────────┘              └───────────┬─────────────┘   │
-│           │ when_pressed callback              │ POST /print     │
-│           └────────────┬───────────────────────┘                 │
-│                        ↓                                          │
-├────────────────────────────────────────────────────────────────────┤
-│                    Shared Trigger Handler                        │
-│                    (trigger_print_job.py)                        │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  • Load config (which triggers enabled)                  │    │
-│  │  • Call existing print_file() from printer.py            │    │
-│  │  • Handle errors and return status                       │    │
-│  └────────────────────────────┬─────────────────────────────┘    │
+│                   Service Layer (systemd)                         │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  ducky-printer.service  (auto-start, restart on failure)   │   │
+│  └────────────────────────────┬───────────────────────────────┘   │
 │                               ↓                                   │
 ├──────────────────────────────────────────────────────────────────┤
-│              Existing Printer Layer (v0.1) - REUSE               │
+│                   Application Entry Point                        │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │  gpio_listener.py (main loop with signal.pause())          │   │
+│  │  • Reads config at startup                                 │   │
+│  │  • Creates Button (momentary) or sets up switch callbacks  │   │
+│  │  • Enforces cooldown between activations                   │   │
+│  └────────────────────────────┬───────────────────────────────┘   │
+│                               ↓ (callback on GPIO event)          │
 ├──────────────────────────────────────────────────────────────────┤
+│                   New Integration Modules (v0.2)                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  config.py       │  │  file_picker.py  │  │  trigger_       │  │
+│  │  Load YAML       │  │  Random file     │  │  handler.py     │  │
+│  │  Validate keys   │  │  selection from  │  │  Orchestrate    │  │
+│  │  Type-safe       │  │  source folder   │  │  pick + print   │  │
+│  │  access          │  │  Filter by ext   │  │  Return status  │  │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
+│           │                     │                     │           │
+├───────────┴─────────────────────┴─────────────────────┴──────────┤
+│                   Existing Print Pipeline (v0.1 - UNCHANGED)     │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────┐  │
 │  │  print_file()   │  │  print_image()   │  │  print_text()  │  │
 │  │  (dispatcher)   │  │  (USB + PIL)     │  │  (USB ESC/POS) │  │
 │  └────────┬────────┘  └─────────┬────────┘  └────────┬───────┘  │
-│           │                     │                     │           │
 │           └─────────────────────┴─────────────────────┘           │
 │                               ↓                                   │
-├──────────────────────────────────────────────────────────────────┤
 │                    USB Printer Communication                      │
-│                    (python-escpos library)                        │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │  • find_printer() - class 7 USB detection                │    │
-│  │  • Per-job lifecycle: open() → print → cut() → close()  │    │
-│  │  • Endpoints: in_ep=0x81, out_ep=0x02                   │    │
-│  └──────────────────────────────────────────────────────────┘    │
+│                    find_printer() → open() → print → close()     │
 └──────────────────────────────────────────────────────────────────┘
-
                                ↓
-                    Citizen CT-S310IIEBK
-                      (USB Thermal Printer)
+                    Citizen CT-S310IIEBK (USB)
 ```
 
-### Component Responsibilities
+## Component Responsibilities
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| **GPIO Listener** | Detect physical button press events | gpiozero Button with when_pressed callback |
-| **Flask Web Server** | HTTP interface for web-based print triggers | Flask app with POST /print endpoint |
-| **Shared Trigger Handler** | Unified print logic called by both triggers | Python module with single function |
-| **Config Reader** | Load settings (enabled triggers, file path) | YAML/JSON config file reader |
-| **Existing Printer Layer** | Print operations (text/image routing) | printer.py - NO CHANGES NEEDED |
-| **USB Communication** | Hardware communication with thermal printer | python-escpos Usb class |
+| Component | Responsibility | Status |
+|-----------|----------------|--------|
+| **config.py** | Load and validate YAML config; provide typed access to settings (pin, mode, cooldown, source_folder) | NEW |
+| **file_picker.py** | List printable files in source folder; select one at random; filter by supported extensions | NEW |
+| **trigger_handler.py** | Orchestrate a print job: pick random file, call existing `print_file()`, return success/failure dict | NEW |
+| **gpio_listener.py** | Set up gpiozero Button/callbacks for button or switch mode; enforce cooldown; run as long-lived daemon | NEW |
+| **ducky-printer.service** | systemd unit file for auto-start on boot, restart on crash | NEW |
+| **printer.py** | USB printer communication (auto-detect, connect, print, close) | UNCHANGED |
+| **file_handler.py** | File reading and path resolution | UNCHANGED |
+| **print_job.py** | CLI entry point | UNCHANGED |
 
 ## Recommended Project Structure
 
 ```
 src/
-├── print_job.py           # [v0.1] CLI entry point (UNCHANGED)
-├── printer.py             # [v0.1] USB printer communication (UNCHANGED)
-├── file_handler.py        # [v0.1] File operations (UNCHANGED)
-├── config.py              # [v0.2] NEW - Config file reader
-├── trigger_handler.py     # [v0.2] NEW - Shared print trigger logic
-├── gpio_listener.py       # [v0.2] NEW - GPIO button daemon
-└── web_server.py          # [v0.2] NEW - Flask web interface
+├── __init__.py              # [v0.1] Package init (UNCHANGED)
+├── print_job.py             # [v0.1] CLI entry point (UNCHANGED)
+├── printer.py               # [v0.1] USB printer communication (UNCHANGED)
+├── file_handler.py          # [v0.1] File reading (UNCHANGED)
+├── config.py                # [v0.2] NEW - YAML config loader
+├── file_picker.py           # [v0.2] NEW - Random file selection
+├── trigger_handler.py       # [v0.2] NEW - Shared print trigger orchestration
+└── gpio_listener.py         # [v0.2] NEW - GPIO daemon entry point
 
 config/
-└── printer_config.yaml    # [v0.2] NEW - Configuration file
+└── config.yaml              # [v0.2] NEW - Default configuration file
 
 systemd/
-├── gpio-listener.service  # [v0.2] NEW - GPIO daemon service
-└── web-server.service     # [v0.2] NEW - Flask web service
+└── ducky-printer.service    # [v0.2] NEW - systemd service unit
 
 tests/
-├── test_config.py         # [v0.2] NEW - Config tests
-├── test_trigger_handler.py # [v0.2] NEW - Trigger tests
-├── test_gpio_listener.py  # [v0.2] NEW - GPIO tests
-└── test_web_server.py     # [v0.2] NEW - Web server tests
+├── conftest.py              # [v0.1] Shared fixtures (EXTEND with config fixtures)
+├── test_file_handler.py     # [v0.1] (UNCHANGED)
+├── test_print_job.py        # [v0.1] (UNCHANGED)
+├── test_printer.py          # [v0.1] (UNCHANGED)
+├── test_config.py           # [v0.2] NEW - Config loading tests
+├── test_file_picker.py      # [v0.2] NEW - File selection tests
+├── test_trigger_handler.py  # [v0.2] NEW - Trigger handler tests
+└── test_gpio_listener.py    # [v0.2] NEW - GPIO listener tests (mocked gpiozero)
 ```
 
 ### Structure Rationale
 
-- **Existing v0.1 files remain unchanged**: The printer layer is already well-architected with clear separation of concerns
-- **New v0.2 files are additive**: Integration happens through function calls, not modifications
-- **config.py**: Single source of truth for configuration (which triggers enabled, file path)
-- **trigger_handler.py**: DRY principle - both GPIO and web call the same function
-- **Separate daemons**: GPIO listener and web server run as independent systemd services
-- **Systemd service files**: Standard Linux pattern for auto-start and supervision
+- **Flat `src/` layout preserved:** Existing v0.1 uses flat module structure. No reason to introduce packages for 4 new files.
+- **`config/` directory at project root:** Separates runtime config from code. Standard Linux convention.
+- **`systemd/` directory at project root:** Service files are deployment artifacts, not code. Keeps them findable.
+- **v0.1 files are UNCHANGED:** All new code is additive. The integration point is calling `printer.print_file()`.
 
 ## Architectural Patterns
 
-### Pattern 1: Event-Driven Triggers with Shared Handler
+### Pattern 1: Event-Driven GPIO with Cooldown Guard
 
-**What:** Multiple event sources (GPIO button, HTTP request) converge on a single trigger handler function that calls existing printer code.
+**What:** gpiozero Button detects GPIO events and fires callbacks. A time-based cooldown guard prevents rapid re-triggering (debounce handles electrical noise, cooldown handles intentional rapid presses).
 
-**When to use:** When multiple input mechanisms need to perform the same action. Prevents code duplication and ensures consistent behavior across triggers.
+**When to use:** Physical input triggers that should not fire faster than a configurable rate.
 
 **Trade-offs:**
-- **Pros**: DRY principle, single point of logic change, consistent error handling
-- **Cons**: Adds one level of indirection (trigger → handler → printer)
+- **Pros:** gpiozero handles threading and debounce internally; cooldown is simple timestamp check
+- **Cons:** Cooldown state lives in the daemon process; restarting the service resets it (acceptable)
+
+**Example:**
+```python
+# src/gpio_listener.py (button mode sketch)
+import time
+import logging
+from gpiozero import Button
+from signal import pause
+from src.config import load_config
+from src.trigger_handler import handle_print_trigger
+
+config = load_config()
+last_trigger_time = 0.0
+
+def on_activated():
+    global last_trigger_time
+    now = time.monotonic()
+    cooldown = config.cooldown_seconds
+    if now - last_trigger_time < cooldown:
+        logging.info(f"Cooldown active ({cooldown}s), ignoring")
+        return
+    last_trigger_time = now
+    result = handle_print_trigger(config)
+    logging.info(f"Print result: {result}")
+
+button = Button(
+    config.gpio_pin,
+    pull_up=True,
+    bounce_time=0.1  # 100ms hardware debounce
+)
+button.when_pressed = on_activated
+
+pause()  # Keep daemon alive
+```
+
+### Pattern 2: Dual-Mode GPIO (Button vs Switch)
+
+**What:** Config specifies `mode: button` or `mode: switch`. Button mode uses `when_pressed` only. Switch mode uses `when_pressed` and/or `when_released` depending on `switch_trigger` setting (`both`, `on_only`, `off_only`).
+
+**When to use:** When the same GPIO pin may be connected to either a momentary push button or a toggle switch, and the user should configure which via YAML.
+
+**Trade-offs:**
+- **Pros:** Single codebase supports both hardware configurations; no code change needed when swapping button for switch
+- **Cons:** Slightly more complex GPIO setup logic; must document clearly
+
+**Example:**
+```python
+# In gpio_listener.py setup
+button = Button(config.gpio_pin, pull_up=True, bounce_time=0.1)
+
+if config.gpio_mode == "button":
+    button.when_pressed = on_activated
+elif config.gpio_mode == "switch":
+    trigger = config.switch_trigger  # "both", "on_only", "off_only"
+    if trigger in ("both", "on_only"):
+        button.when_pressed = on_activated
+    if trigger in ("both", "off_only"):
+        button.when_released = on_activated
+```
+
+### Pattern 3: Trigger Handler as Integration Seam
+
+**What:** A thin orchestration module (`trigger_handler.py`) sits between event sources (GPIO today, web later) and the existing print pipeline. It picks a file, calls `printer.print_file()`, and returns a result dict.
+
+**When to use:** When multiple event sources need to trigger the same action, and that action involves multi-step orchestration (pick file, resolve path, call printer).
+
+**Trade-offs:**
+- **Pros:** Testable in isolation (mock `print_file` and `pick_random_file`); future web trigger calls same function; single place for print options logic
+- **Cons:** One layer of indirection (but justified by testability and future extensibility)
 
 **Example:**
 ```python
 # src/trigger_handler.py
-from src.printer import print_file
-from src.config import load_config
+from src.config import Config
+from src.file_picker import pick_random_file
+from src.printer import print_file, PrinterError
+from src.file_handler import FileError
 
-def handle_print_trigger(source: str) -> dict:
-    """
-    Unified print handler called by GPIO and web triggers.
-
-    Args:
-        source: "gpio" or "web" for logging
-
-    Returns:
-        dict with keys: success (bool), message (str)
-    """
+def handle_print_trigger(config: Config) -> dict:
+    """Pick random file and print it. Returns status dict."""
     try:
-        config = load_config()
+        filename = pick_random_file(config.source_folder)
+        if filename is None:
+            return {"success": False, "message": "No printable files found"}
 
-        # Check if trigger source is enabled
-        if not config['triggers'][source]['enabled']:
-            return {"success": False, "message": f"{source} trigger disabled"}
+        print_file(
+            filename,
+            config.source_folder,
+            rotate=config.print_rotate,
+            fit_width=config.print_fit_width,
+            printer_width=config.print_printer_width,
+        )
+        return {"success": True, "message": f"Printed: {filename}"}
 
-        # Call existing printer code (NO CHANGES to printer.py)
-        file_path = config['print_file']
-        print_file(file_path, rotate=True, target_width_cm=8, target_height_cm=18)
-
-        return {"success": True, "message": f"Printed {file_path}"}
-
-    except Exception as e:
+    except (PrinterError, FileError) as e:
         return {"success": False, "message": str(e)}
+    except Exception as e:
+        return {"success": False, "message": f"Unexpected error: {e}"}
 ```
-
-### Pattern 2: Callback-Based GPIO Event Handling
-
-**What:** gpiozero's Button class with when_pressed callback for non-blocking event detection. Requires signal.pause() to keep process alive.
-
-**When to use:** When detecting physical button presses without blocking the main thread. Standard pattern for GPIO input on Raspberry Pi.
-
-**Trade-offs:**
-- **Pros**: Non-blocking, runs callback in separate thread, built-in debouncing
-- **Cons**: Requires daemon process with signal.pause(), callback must be thread-safe
-
-**Example:**
-```python
-# src/gpio_listener.py
-from gpiozero import Button
-from signal import pause
-import logging
-from src.trigger_handler import handle_print_trigger
-
-# GPIO pin 17 (physical pin 11)
-button = Button(17, pull_up=True, bounce_time=0.1)
-
-def on_button_press():
-    """Callback executed in separate thread when button pressed."""
-    logging.info("Button pressed - triggering print")
-    result = handle_print_trigger(source="gpio")
-
-    if result['success']:
-        logging.info(f"Print successful: {result['message']}")
-    else:
-        logging.error(f"Print failed: {result['message']}")
-
-# Assign callback (reference, not call)
-button.when_pressed = on_button_press
-
-logging.info("GPIO listener started on pin 17")
-
-# Keep process alive to detect events
-pause()
-```
-
-### Pattern 3: Lightweight Flask Web Server
-
-**What:** Flask app with single POST endpoint, run with threading or gevent for concurrent requests. No database needed.
-
-**When to use:** Simple web interface for triggering actions. Overkill for complex CRUD apps, perfect for trigger-based systems.
-
-**Trade-offs:**
-- **Pros**: Minimal dependencies, easy to test, works on Raspberry Pi 3B+
-- **Cons**: Not suitable for high-traffic (but not needed for single-printer system)
-
-**Example:**
-```python
-# src/web_server.py
-from flask import Flask, request, jsonify, render_template
-from src.trigger_handler import handle_print_trigger
-
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    """Serve simple HTML page with print button."""
-    return render_template('index.html')
-
-@app.route('/print', methods=['POST'])
-def trigger_print():
-    """HTTP endpoint to trigger print job."""
-    result = handle_print_trigger(source="web")
-    return jsonify(result), 200 if result['success'] else 500
-
-if __name__ == '__main__':
-    # host='0.0.0.0' allows access from WiFi clients
-    # threaded=True handles concurrent requests (adequate for low traffic)
-    app.run(host='0.0.0.0', port=5000, threaded=True)
-```
-
-### Pattern 4: Per-Job Connection Lifecycle (v0.1 - KEEP)
-
-**What:** Open USB connection, print, close connection for each print job. Already implemented in printer.py.
-
-**When to use:** USB devices that can enter busy state after power cycles. Critical for thermal printers.
-
-**Trade-offs:**
-- **Pros**: Prevents device busy errors, clean state per job
-- **Cons**: Slight overhead per job (negligible for on-demand printing)
-
-**Why keep:** Already working perfectly in v0.1. New triggers just call existing functions.
 
 ## Data Flow
 
-### GPIO Print Flow
+### GPIO Button Press to Print Output
 
 ```
-Physical Button Press (GPIO 17)
-    ↓
-gpiozero Button detects event
-    ↓
-when_pressed callback (separate thread)
-    ↓
-handle_print_trigger(source="gpio")
-    ↓
-Load config → Check GPIO enabled → Get file path
-    ↓
-print_file(filename, rotate=True, target_width_cm=8, target_height_cm=18)
-    ↓
-find_printer() → open() → print_image() → cut() → close()
-    ↓
-USB ESC/POS commands to Citizen CT-S310IIEBK
-    ↓
-Thermal printer outputs receipt
+1. Physical button press (GPIO pin goes LOW)
+       ↓
+2. gpiozero Button detects edge (internal thread)
+   - bounce_time=0.1 filters electrical noise
+       ↓
+3. when_pressed callback fires (gpiozero callback thread)
+       ↓
+4. Cooldown check (time.monotonic() comparison)
+   - If within cooldown: log + return (no print)
+   - If past cooldown: proceed
+       ↓
+5. handle_print_trigger(config) called
+       ↓
+6. pick_random_file(source_folder)
+   - List files matching extensions [.txt, .png, .jpg, .jpeg, .bmp]
+   - random.choice() to select one
+       ↓
+7. printer.print_file(filename, source_folder, **print_options)
+   - resolve_filepath() → full path
+   - Detect extension → route to print_text_file() or print_image()
+       ↓
+8. find_printer() → USB class 7 detection
+       ↓
+9. printer.open() → printer.text()/printer.image() → printer.cut() → printer.close()
+       ↓
+10. USB ESC/POS commands → Citizen CT-S310IIEBK → thermal output
+       ↓
+11. Result dict returned up the call stack
+       ↓
+12. gpio_listener logs success/failure
 ```
 
-### Web Print Flow
+### Switch Mode Data Flow (Differences from Button)
 
 ```
-User clicks "Print" button in browser
+Toggle switch flipped ON (GPIO goes LOW)
     ↓
-JavaScript sends POST /print
+when_pressed fires → same flow as button (steps 4-12)
+
+Toggle switch flipped OFF (GPIO goes HIGH)
     ↓
-Flask route handler receives request
-    ↓
-handle_print_trigger(source="web")
-    ↓
-Load config → Check web enabled → Get file path
-    ↓
-print_file(filename, rotate=True, target_width_cm=8, target_height_cm=18)
-    ↓
-find_printer() → open() → print_image() → cut() → close()
-    ↓
-USB ESC/POS commands to Citizen CT-S310IIEBK
-    ↓
-Thermal printer outputs receipt
-    ↓
-JSON response {"success": true, "message": "..."}
-    ↓
-Browser displays success/error message
+when_released fires → same flow as button (steps 4-12)
+(only if switch_trigger is "both" or "off_only")
 ```
 
 ### Configuration Loading Flow
 
 ```
-System Start
+systemd starts ducky-printer.service
     ↓
-systemd starts gpio-listener.service and web-server.service
+gpio_listener.py imports and calls load_config()
     ↓
-Each service imports trigger_handler.py
+Reads config/config.yaml from project root
     ↓
-First trigger call loads config/printer_config.yaml
+Validates required keys present (gpio_pin, mode, source_folder)
     ↓
-Config cached in memory for subsequent calls
+Returns Config object (dataclass or typed dict)
     ↓
-Triggers check if their source is enabled before proceeding
+Config passed to on_activated callback via closure
+    ↓
+No hot-reload: restart service to pick up config changes
 ```
-
-### Key Data Flows
-
-1. **Config-driven trigger enablement:** Both GPIO and web check config before executing. Allows disabling triggers without code changes.
-
-2. **Shared printer access:** Both triggers call the same printer functions. USB connection lifecycle ensures thread-safety through per-job connections.
-
-3. **Independent daemon processes:** GPIO listener and web server run as separate systemd services. If one crashes, the other continues working.
 
 ## Integration Points
 
-### New Code → Existing Code Integration
+### New Code to Existing Code Integration
 
-| Integration Point | New Component | Existing Component | How They Connect |
-|-------------------|---------------|-------------------|------------------|
-| **Print trigger** | trigger_handler.py | printer.print_file() | Function call with hardcoded params |
-| **File resolution** | trigger_handler.py | file_handler.resolve_filepath() | Optional: validate file exists before printing |
-| **Error handling** | trigger_handler.py | PrinterError, FileError exceptions | Catch and convert to dict response |
-| **CLI compatibility** | gpio_listener.py, web_server.py | print_job.py | No conflicts - different entry points |
+| New Module | Calls | In Existing Module | How |
+|------------|-------|--------------------|-----|
+| `trigger_handler.py` | `print_file()` | `printer.py` | Direct function import; passes filename, source_folder, and print options |
+| `trigger_handler.py` | `PrinterError`, `FileError` | `printer.py`, `file_handler.py` | Catches exceptions, converts to result dict |
+| `file_picker.py` | `resolve_filepath()` | `file_handler.py` | Optional: could use for path validation, but `Path.glob()` is simpler for listing |
+| `gpio_listener.py` | None | None | Only calls trigger_handler; no direct dependency on v0.1 modules |
 
-### External Integration Points
+### Key Constraint: No Modifications to v0.1 Code
 
-| External System | Integration Pattern | Notes |
-|-----------------|---------------------|-------|
-| **USB Printer** | python-escpos Usb class | Already working in v0.1 - NO CHANGES |
-| **GPIO Hardware** | gpiozero Button class | Pin 17 (physical pin 11), pull-up resistor |
-| **WiFi Clients** | Flask HTTP server on 0.0.0.0:5000 | Requires WiFi AP configured (hostapd/dnsmasq) |
-| **systemd** | Service unit files with ExecStart | Auto-start daemons on boot, restart on failure |
+The existing `printer.print_file()` signature already supports everything needed:
+
+```python
+# Existing signature (printer.py line 293)
+def print_file(filename, base_folder, rotate=False, scale_percent=100,
+               fit_width=False, printer_width=576,
+               target_width_cm=None, target_height_cm=None)
+```
+
+The trigger handler calls this directly. No changes required.
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| **GPIO ↔ Trigger Handler** | Direct function call | Same process, callback runs in gpiozero thread |
-| **Web ↔ Trigger Handler** | Direct function call | Same process, runs in Flask request thread |
-| **Trigger Handler ↔ Printer** | Direct function call | Imports from printer.py, calls print_file() |
-| **GPIO Daemon ↔ Web Daemon** | No direct communication | Independent processes, coordinated via USB printer access |
-
-## Threading and Concurrency
-
-### gpiozero Threading Model
-
-- **Button detection:** gpiozero starts internal thread monitoring GPIO pin state
-- **Callback execution:** when_pressed callback runs in separate thread
-- **Thread safety:** trigger_handler.py must be thread-safe (per-job USB connections provide this)
-- **Process lifetime:** signal.pause() keeps main thread alive indefinitely
-
-### Flask Threading Model
-
-- **Request handling:** Flask with threaded=True spawns thread per request
-- **Concurrency limit:** Threading mode adequate for low traffic (1-10 req/sec)
-- **Alternative:** Could use gevent for higher concurrency, but unnecessary for single-user printer
-- **Thread safety:** Same as GPIO - per-job USB connections provide thread safety
-
-### USB Printer Thread Safety
-
-- **Per-job connections:** Each print call opens new USB connection
-- **No shared state:** printer.py has no global printer instance
-- **Automatic serialization:** USB bus serializes concurrent access at kernel level
-- **Implication:** Both triggers can call printer simultaneously without explicit locking
+| **gpio_listener -> trigger_handler** | Direct function call | Same process; callback thread calls handler |
+| **trigger_handler -> file_picker** | Direct function call | Returns filename string |
+| **trigger_handler -> printer** | Direct function call | Imports `print_file` from `printer.py` |
+| **config -> all modules** | Config object passed as parameter | Loaded once at startup, passed via closure |
 
 ## Configuration Design
 
-### Recommended Format: YAML
+### YAML Schema
 
-**Why YAML:**
-- Human-readable for editing on Raspberry Pi
-- Supports comments for documentation
-- Standard for DevOps/system configuration
-- Python PyYAML library widely available
-
-**Example config/printer_config.yaml:**
 ```yaml
-# Thermal Printer Trigger Configuration
+# config/config.yaml
 
-# Which file to print (relative to print_files folder)
-print_file: "wish1.png"
+# GPIO settings
+gpio:
+  pin: 17              # BCM pin number (physical pin 11)
+  mode: button          # "button" (momentary) or "switch" (toggle)
+  switch_trigger: both  # "both", "on_only", "off_only" (only used when mode=switch)
 
-# Print options for image
+# Print trigger settings
+trigger:
+  cooldown_seconds: 5   # Minimum seconds between activations
+  source_folder: /home/admin/ducky-printer-project/print_files
+
+# Print options (passed to printer.print_file())
 print_options:
-  rotate: true
-  target_width_cm: 8.0
-  target_height_cm: 18.0
-
-# Enable/disable trigger sources
-triggers:
-  gpio:
-    enabled: true
-    pin: 17  # Physical pin 11
-  web:
-    enabled: true
-    port: 5000
+  rotate: false
+  fit_width: true
+  printer_width: 576    # 576 for 80mm paper, 384 for 58mm
+  # target_width_cm and target_height_cm are optional overrides
 ```
 
-### Config Loading Pattern
+### Config Module Design
+
+Use a dataclass or simple class for typed access rather than raw dict traversal. This catches missing keys at load time rather than at print time.
 
 ```python
 # src/config.py
 import yaml
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Any
 
-_config_cache: Dict[str, Any] = None
+@dataclass
+class Config:
+    gpio_pin: int
+    gpio_mode: str           # "button" or "switch"
+    switch_trigger: str      # "both", "on_only", "off_only"
+    cooldown_seconds: float
+    source_folder: str
+    print_rotate: bool
+    print_fit_width: bool
+    print_printer_width: int
+    print_target_width_cm: float | None
+    print_target_height_cm: float | None
 
-def load_config(config_path: str = "/home/admin/ducky-printer-project/config/printer_config.yaml") -> Dict[str, Any]:
-    """Load configuration from YAML file with caching."""
-    global _config_cache
+def load_config(config_path: str = None) -> Config:
+    """Load config from YAML file, validate, return Config dataclass."""
+    if config_path is None:
+        # Default: config/config.yaml relative to project root
+        config_path = Path(__file__).parent.parent / "config" / "config.yaml"
 
-    if _config_cache is None:
-        with open(config_path, 'r') as f:
-            _config_cache = yaml.safe_load(f)
+    with open(config_path, 'r') as f:
+        raw = yaml.safe_load(f)
 
-    return _config_cache
+    # Extract with defaults
+    gpio = raw.get('gpio', {})
+    trigger = raw.get('trigger', {})
+    opts = raw.get('print_options', {})
 
-def reload_config(config_path: str = "/home/admin/ducky-printer-project/config/printer_config.yaml") -> Dict[str, Any]:
-    """Force reload configuration from disk."""
-    global _config_cache
-    _config_cache = None
-    return load_config(config_path)
+    return Config(
+        gpio_pin=gpio['pin'],  # Required, no default
+        gpio_mode=gpio.get('mode', 'button'),
+        switch_trigger=gpio.get('switch_trigger', 'both'),
+        cooldown_seconds=trigger.get('cooldown_seconds', 5),
+        source_folder=trigger.get('source_folder',
+            '/home/admin/ducky-printer-project/print_files'),
+        print_rotate=opts.get('rotate', False),
+        print_fit_width=opts.get('fit_width', True),
+        print_printer_width=opts.get('printer_width', 576),
+        print_target_width_cm=opts.get('target_width_cm'),
+        print_target_height_cm=opts.get('target_height_cm'),
+    )
 ```
 
 ## systemd Service Integration
 
-### GPIO Listener Service
+### Single Service (Not Two)
 
-**File:** /etc/systemd/system/gpio-listener.service
+Since v0.2 is GPIO-only (web deferred), there is only one service:
+
 ```ini
+# systemd/ducky-printer.service
 [Unit]
-Description=Thermal Printer GPIO Button Listener
-After=network.target
+Description=Ducky Thermal Printer GPIO Listener
+After=local-fs.target
 
 [Service]
 Type=simple
-User=admin
+User=root
 WorkingDirectory=/home/admin/ducky-printer-project
-ExecStart=/usr/bin/python3 /home/admin/ducky-printer-project/src/gpio_listener.py
+ExecStart=/usr/bin/python3 -m src.gpio_listener
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -441,336 +413,144 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-### Web Server Service
+**Why `User=root`:** GPIO access on Raspberry Pi requires root or gpio group membership. Running as root is simplest for a dedicated appliance. Alternative: add user to `gpio` group and run as `admin`.
 
-**File:** /etc/systemd/system/web-server.service
-```ini
-[Unit]
-Description=Thermal Printer Web Interface
-After=network.target
+**Why `After=local-fs.target`:** No network needed for GPIO printing. Only needs filesystem mounted (for config and print files).
 
-[Service]
-Type=simple
-User=admin
-WorkingDirectory=/home/admin/ducky-printer-project
-ExecStart=/usr/bin/python3 /home/admin/ducky-printer-project/src/web_server.py
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Service Management Commands
-
-```bash
-# Enable auto-start on boot
-sudo systemctl enable gpio-listener.service
-sudo systemctl enable web-server.service
-
-# Start services
-sudo systemctl start gpio-listener.service
-sudo systemctl start web-server.service
-
-# Check status
-sudo systemctl status gpio-listener.service
-sudo systemctl status web-server.service
-
-# View logs
-sudo journalctl -u gpio-listener.service -f
-sudo journalctl -u web-server.service -f
-```
+**Why `-m src.gpio_listener`:** Uses Python module syntax consistent with existing `python3 -m src.print_job` pattern.
 
 ## Build Order and Dependencies
 
 ### Dependency Graph
 
 ```
-Phase 1: Foundation
-├── config.py (no dependencies)
-└── trigger_handler.py (depends: config.py, printer.py)
-
-Phase 2: GPIO Trigger
-└── gpio_listener.py (depends: trigger_handler.py, gpiozero)
-
-Phase 3: Web Trigger
-├── web_server.py (depends: trigger_handler.py, Flask)
-└── templates/index.html (static HTML)
-
-Phase 4: System Integration
-├── systemd service files
-└── WiFi AP configuration (hostapd/dnsmasq)
+                    ┌──────────────┐
+                    │  config.py   │  ← No dependencies on other new modules
+                    └──────┬───────┘
+                           │
+              ┌────────────┼────────────┐
+              ↓            ↓            ↓
+     ┌──────────────┐ ┌──────────────┐  │
+     │ file_picker  │ │ trigger_     │  │
+     │   .py        │ │ handler.py   │←─┘ (uses config + file_picker + printer.py)
+     └──────┬───────┘ └──────┬───────┘
+            │                │
+            └────────┬───────┘
+                     ↓
+            ┌──────────────────┐
+            │ gpio_listener.py │  ← Uses config + trigger_handler
+            └──────────────────┘
+                     ↓
+            ┌──────────────────┐
+            │ systemd service  │  ← Deployment artifact wrapping gpio_listener
+            └──────────────────┘
 ```
 
 ### Recommended Build Order
 
-1. **Config system (lowest risk)**
-   - Write config.py with load_config()
-   - Create example printer_config.yaml
-   - Write tests for config loading
-   - **Why first:** No external dependencies, pure Python
+**Phase 1: Configuration Foundation**
+- Build `config.py` with `load_config()` returning `Config` dataclass
+- Create `config/config.yaml` with documented defaults
+- Write `test_config.py`: valid config, missing keys, bad values, defaults
+- **Why first:** Zero external dependencies. Pure Python. Every other module depends on it.
 
-2. **Shared trigger handler (integration layer)**
-   - Write trigger_handler.py calling printer.print_file()
-   - Hardcode wish1.png with rotation and dimensions
-   - Write tests mocking printer.print_file()
-   - **Why second:** Establishes integration point before building triggers
+**Phase 2: Random File Selection**
+- Build `file_picker.py` with `pick_random_file(source_folder)` and `list_printable_files(source_folder)`
+- Write `test_file_picker.py`: empty folder, single file, multiple files, unsupported extensions filtered, nonexistent folder
+- **Why second:** Also pure Python (pathlib + random). No GPIO or printer hardware needed. Independent testability.
 
-3. **GPIO trigger (hardware dependency)**
-   - Write gpio_listener.py with gpiozero Button
-   - Test with actual button hardware
-   - Create systemd service file
-   - **Why third:** Requires physical setup, easier to debug in isolation
+**Phase 3: Trigger Handler (Integration Seam)**
+- Build `trigger_handler.py` with `handle_print_trigger(config)`
+- Write `test_trigger_handler.py`: mock `printer.print_file()` and `pick_random_file()`, verify correct params passed, verify error handling
+- **Why third:** This is the integration point. By building it before GPIO, you can test the full pick-and-print logic without hardware.
 
-4. **Web trigger (network dependency)**
-   - Write web_server.py with Flask
-   - Create simple HTML interface
-   - Test from browser on local network
-   - Create systemd service file
-   - **Why fourth:** Can test without WiFi AP, just need network access
+**Phase 4: GPIO Listener**
+- Build `gpio_listener.py` with button/switch mode setup, cooldown enforcement
+- Write `test_gpio_listener.py`: mock gpiozero Button, simulate press events, verify cooldown works, verify switch mode callbacks
+- **Why fourth:** Depends on all previous modules. GPIO mocking with `gpiozero.Device.pin_factory = MockFactory` enables testing without hardware.
 
-5. **WiFi AP setup (infrastructure)**
-   - Configure hostapd for access point
-   - Configure dnsmasq for DHCP
-   - Test client connection and web access
-   - **Why last:** Infrastructure change, affects network connectivity
+**Phase 5: systemd Service**
+- Create `systemd/ducky-printer.service` unit file
+- Write install/uninstall script or document manual steps
+- Test on actual Raspberry Pi: enable, start, verify auto-start on boot, verify restart on crash
+- **Why last:** Pure deployment concern. All code is testable before this phase. Hardware-only validation.
 
-### Testing Strategy at Each Stage
+### Testing Strategy Per Phase
 
-| Stage | Test Approach | Pass Criteria |
-|-------|---------------|---------------|
-| **Config** | Unit tests with sample YAML | Load config, access nested values |
-| **Trigger Handler** | Unit tests with mocked printer.print_file() | Returns success dict, handles errors |
-| **GPIO** | Manual test with physical button | Button press triggers print, logs visible |
-| **Web** | HTTP requests with curl/browser | POST /print returns JSON, triggers print |
-| **Integrated** | Both triggers print simultaneously | No USB conflicts, both succeed |
-| **WiFi AP** | Connect client device, access web interface | Device connects, web interface loads |
+| Phase | Test Type | Hardware Needed | Mock Strategy |
+|-------|-----------|-----------------|---------------|
+| Config | Unit | No | Sample YAML files via tmp_path |
+| File Picker | Unit | No | tmp_path with test files |
+| Trigger Handler | Unit | No | Mock `print_file()`, `pick_random_file()` |
+| GPIO Listener | Unit + Manual | Mock for unit, Pi for manual | `gpiozero.Device.pin_factory = MockFactory` |
+| systemd | Manual | Yes (Raspberry Pi) | N/A |
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Modifying Existing Printer Code
+### Anti-Pattern 1: Modifying Existing v0.1 Modules
 
-**What people do:** Add GPIO/web logic directly into printer.py or print_job.py
+**What people do:** Add GPIO or config logic into `printer.py`, `file_handler.py`, or `print_job.py`.
+**Why it's wrong:** Breaks single responsibility. Makes v0.1 CLI mode dependent on config system. Risks breaking 23 existing tests.
+**Do this instead:** New modules call existing functions as a library. Zero changes to v0.1.
 
-**Why it's wrong:**
-- Breaks single responsibility principle (printer.py should only handle USB communication)
-- Makes testing harder (can't test triggers without printer hardware)
-- Creates merge conflicts if printer code evolves
+### Anti-Pattern 2: Persistent USB Connection
 
-**Do this instead:** Create separate trigger modules that call existing printer functions as a library
+**What people do:** Open USB connection once at daemon start, reuse for all prints.
+**Why it's wrong:** USB devices enter busy state after power cycles. This is exactly why v0.1 uses per-job lifecycle (documented as key decision in PROJECT.md).
+**Do this instead:** Let `printer.print_file()` handle its own connection lifecycle per call.
 
-### Anti-Pattern 2: Shared USB Connection Instance
+### Anti-Pattern 3: Hot-Reloading Config in a GPIO Daemon
 
-**What people do:** Open USB connection once at daemon start, reuse for all prints
+**What people do:** Watch config file for changes, reload on the fly.
+**Why it's wrong:** Adds complexity (file watchers, thread safety for config access, partial state during reload). For an embedded appliance, `systemctl restart ducky-printer` is the expected config reload mechanism.
+**Do this instead:** Load config once at startup. Document that service restart applies config changes.
 
-**Why it's wrong:**
-- USB devices can enter busy state after errors
-- Power cycling printer while daemon running causes crashes
-- v0.1 specifically uses per-job connections to avoid this
+### Anti-Pattern 4: Using RPi.GPIO Instead of gpiozero
 
-**Do this instead:** Keep existing per-job connection lifecycle, let each trigger call print_file() which handles connections
+**What people do:** Use the lower-level `RPi.GPIO` library directly.
+**Why it's wrong:** Requires manual cleanup (`GPIO.cleanup()`), manual threading for callbacks, manual debounce logic, no mock pin factory for testing.
+**Do this instead:** Use gpiozero. It provides `Button` class with built-in debounce, callback threading, mock factories, and a cleaner API.
 
-### Anti-Pattern 3: Complex Event Queue Between Triggers
+### Anti-Pattern 5: Threading Lock for Print Serialization
 
-**What people do:** Build producer-consumer queue with both triggers as producers
+**What people do:** Add `threading.Lock()` around print calls to prevent concurrent USB access.
+**Why it's wrong:** Unnecessary complexity. The per-job connection lifecycle in `printer.py` means each call opens its own USB handle. The USB kernel driver serializes access. With a single GPIO trigger source and cooldown, concurrent prints are already prevented.
+**Do this instead:** Rely on cooldown to space out triggers. Per-job USB connections handle the rare case of overlapping calls naturally.
 
-**Why it's wrong:**
-- Over-engineering for single-user system
-- Adds complexity without solving actual problem
-- Per-job USB connections already provide thread safety
+### Anti-Pattern 6: Putting Config in Python Code
 
-**Do this instead:** Let each trigger call printer directly, USB serialization handles concurrency
-
-### Anti-Pattern 4: Flask with Gevent Before Measuring Performance
-
-**What people do:** Use gevent or eventlet "for better performance"
-
-**Why it's wrong:**
-- Threading mode adequate for 1-10 prints/minute
-- Gevent adds complexity and compatibility issues
-- Premature optimization
-
-**Do this instead:** Start with Flask's built-in threading (threaded=True), only optimize if latency problems appear
-
-### Anti-Pattern 5: Blocking GPIO Callback
-
-**What people do:** Add time.sleep() or blocking operations in when_pressed callback
-
-**Why it's wrong:**
-- Callback runs in gpiozero's internal thread
-- Blocking prevents other GPIO events from being detected
-- Can cause when_released to fire late
-
-**Do this instead:** Keep callbacks quick - call trigger_handler (which is already fast) and return immediately
+**What people do:** Define pin numbers, paths, and options as constants in Python source files.
+**Why it's wrong:** Users must edit Python to change settings. Error-prone on a headless Raspberry Pi. YAML is human-friendly and editable with `nano`.
+**Do this instead:** All user-configurable values go in `config/config.yaml`. Python code reads the YAML.
 
 ## Scaling Considerations
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| **1 printer, 1-10 prints/hour** | Current architecture perfect - threading adequate, no queue needed |
-| **1 printer, 100+ prints/hour** | Add Queue between triggers and printer to prevent USB contention, rate limiting |
-| **Multiple printers** | Config specifies printer ID, find_printer() accepts vendor/product filter |
+| **1 button, 1 printer, casual use** | Current architecture is exactly right. No changes needed. |
+| **Adding web trigger later (v0.3)** | Web server module calls same `handle_print_trigger()`. Add print queue if concerned about concurrent GPIO + web triggers. |
+| **Multiple print files with weighted selection** | Extend `file_picker.py` with weight config. Config-driven, no architecture change. |
+| **Multiple printers** | Out of scope per PROJECT.md. Would require `find_printer()` to accept vendor/product filter. |
 
 ### Scaling Priorities
 
-1. **First bottleneck:** USB printer speed (~10 sec per receipt)
-   - **Symptom:** Triggers timeout waiting for printer
-   - **Fix:** Add Queue with max depth, return "queued" status immediately
-
-2. **Second bottleneck:** Flask threading limit (~10 concurrent requests)
-   - **Symptom:** Web requests hang during concurrent access
-   - **Fix:** Switch to gevent mode: app.run(host='0.0.0.0', port=5000, **async_mode='gevent'**)
-
-**Reality check:** For single-user "print on demand" system, will never hit these limits. Keep it simple.
-
-## WiFi Access Point Architecture
-
-### Component Stack
-
-```
-WiFi Client Device (phone/laptop)
-    ↓ (WiFi association)
-hostapd (access point daemon)
-    ↓ (DHCP request)
-dnsmasq (DHCP server)
-    ↓ (IP assigned: 192.168.4.x)
-Client accesses http://192.168.4.1:5000
-    ↓
-Flask Web Server (web_server.py)
-```
-
-### Network Configuration
-
-**Static IP for wlan0:**
-```
-interface wlan0
-    static ip_address=192.168.4.1/24
-    nohook wpa_supplicant
-```
-
-**hostapd.conf:**
-```
-interface=wlan0
-ssid=DuckyPrinter
-hw_mode=g
-channel=7
-wmm_enabled=0
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=printer123
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
-country_code=US
-```
-
-**dnsmasq.conf:**
-```
-interface=wlan0
-dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
-domain=local
-address=/printer.local/192.168.4.1
-```
-
-### Access Pattern
-
-1. Client connects to "DuckyPrinter" WiFi network
-2. Receives IP in 192.168.4.x range from dnsmasq
-3. Opens browser to http://192.168.4.1:5000
-4. Clicks "Print" button
-5. JavaScript sends POST to /print endpoint
-6. Flask triggers print, returns JSON response
-
-## Testing Architecture
-
-### Unit Tests (Fast, No Hardware)
-
-```python
-# tests/test_trigger_handler.py
-from unittest.mock import patch, MagicMock
-from src.trigger_handler import handle_print_trigger
-
-@patch('src.trigger_handler.load_config')
-@patch('src.trigger_handler.print_file')
-def test_handle_print_trigger_success(mock_print, mock_config):
-    mock_config.return_value = {
-        'triggers': {'gpio': {'enabled': True}},
-        'print_file': 'wish1.png'
-    }
-    mock_print.return_value = 0
-
-    result = handle_print_trigger(source='gpio')
-
-    assert result['success'] == True
-    mock_print.assert_called_once_with(
-        'wish1.png',
-        rotate=True,
-        target_width_cm=8,
-        target_height_cm=18
-    )
-```
-
-### Integration Tests (Hardware Required)
-
-```python
-# tests/integration/test_gpio_integration.py
-import time
-from src.gpio_listener import button
-from src.trigger_handler import handle_print_trigger
-
-def test_button_press_triggers_print(monkeypatch):
-    """Requires physical button on GPIO 17 and USB printer."""
-    printed = []
-
-    def mock_trigger(source):
-        printed.append(source)
-        return {"success": True, "message": "test"}
-
-    monkeypatch.setattr('src.gpio_listener.handle_print_trigger', mock_trigger)
-
-    print("Press button within 5 seconds...")
-    time.sleep(5)
-
-    assert 'gpio' in printed, "Button press not detected"
-```
-
-### Manual Test Plan
-
-| Test | Steps | Expected Result |
-|------|-------|-----------------|
-| **Config load** | Run python -c "from src.config import load_config; print(load_config())" | Prints config dict, no errors |
-| **GPIO trigger** | Wire button to GPIO 17, start gpio_listener.py, press button | Print job executes, logs show success |
-| **Web trigger** | Start web_server.py, curl -X POST http://localhost:5000/print | Returns JSON, print job executes |
-| **Concurrent triggers** | Press button while web request in flight | Both prints complete successfully |
-| **WiFi AP** | Connect phone to DuckyPrinter WiFi, open http://192.168.4.1:5000 | Web interface loads, print button works |
+1. **Not a concern for v0.2:** Single button, single printer, cooldown-gated. The architecture cannot be stressed.
+2. **Future web trigger:** The trigger_handler abstraction exists specifically to support this without architectural changes.
 
 ## Sources
 
 ### Official Documentation
-- [gpiozero Button API](https://gpiozero.readthedocs.io/en/stable/api_input.html)
-- [gpiozero Basic Recipes](https://gpiozero.readthedocs.io/en/stable/recipes.html)
-- [Flask with Gevent](https://flask.palletsprojects.com/en/stable/gevent/)
-- [Python threading module](https://docs.python.org/3/library/threading.html)
-- [Python queue module](https://docs.python.org/3/library/queue.html)
+- [gpiozero Button API and Recipes](https://gpiozero.readthedocs.io/en/stable/recipes.html) -- button/switch patterns, when_pressed/when_released callbacks, bounce_time, MockFactory
+- [gpiozero Input Devices source](https://gpiozero.readthedocs.io/en/stable/_modules/gpiozero/input_devices.html) -- Button internals, threading model
+- [systemd.service man page](https://www.freedesktop.org/software/systemd/man/systemd.service.html) -- Type=simple, Restart, After dependencies
+- [PyYAML safe_load](https://pyyaml.org/wiki/PyYAMLDocumentation) -- YAML loading best practices
 
-### Integration Patterns
-- [Raspberry Pi systemd autorun](https://www.raspberrypi-spy.co.uk/2015/10/how-to-autorun-a-python-script-on-boot-using-systemd/)
-- [Python systemd tutorial](https://github.com/torfsen/python-systemd-tutorial)
-- [Create wireless access point - Raspberry Pi Guide](https://raspberrypi-guide.github.io/networking/create-wireless-access-point)
-
-### Configuration Best Practices
-- [JSON vs YAML vs TOML in 2026](https://dev.to/jsontoall_tools/json-vs-yaml-vs-toml-which-configuration-format-should-you-use-in-2026-1hlb)
-- [Configuration files in Python](https://martin-thoma.com/configuration-files-in-python/)
-
-### Community Resources
-- [Raspberry Pi GPIO button callbacks discussion](https://forums.raspberrypi.com/viewtopic.php?t=316608)
-- [Flask threading vs gevent discussion](https://github.com/miguelgrinberg/Flask-SocketIO/discussions/1915)
-- [gpiozero multiprocessing considerations](https://github.com/gpiozero/gpiozero/issues/759)
+### Existing Codebase (Verified by Reading Source)
+- `src/printer.py` -- `print_file()` signature at line 293, per-job connection lifecycle, `PrinterError` exception
+- `src/file_handler.py` -- `resolve_filepath()`, `FileError` exception, UTF-8 validation
+- `src/print_job.py` -- CLI entry point, argument parsing (shows all print_file kwargs)
+- `tests/conftest.py` -- Existing test fixtures (mock_printer, mock_usb_device, temp_test_file)
 
 ---
-*Architecture research for: GPIO and Web Trigger Integration*
-*Researched: 2026-03-13*
+*Architecture research for: GPIO Print Trigger Integration (v0.2)*
+*Researched: 2026-03-19*

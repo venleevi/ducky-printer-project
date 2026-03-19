@@ -1,189 +1,241 @@
-# Technology Stack — v0.2 Additions
+# Technology Stack — v0.2 GPIO Print Trigger
 
 **Project:** Ducky Thermal Printer POC
-**Milestone:** v0.2 - User-Triggered Printing
-**Researched:** 2026-03-13
-**Platform:** Raspberry Pi 3B+ (ARM, Bookworm OS)
+**Milestone:** v0.2 - GPIO Print Trigger
+**Researched:** 2026-03-19
+**Platform:** Raspberry Pi 3B+ (ARM, Bookworm OS, kernel 6.6)
 **Existing Stack:** Python 3.13.5, python-escpos 3.0+, pyusb 1.0+
 
 ## Executive Summary
 
-**New capabilities:** GPIO button trigger, web interface, WiFi access point hosting
-**Stack additions:** gpiozero (GPIO), Flask (web), NetworkManager (WiFi AP)
-**Philosophy:** Lightweight, minimal dependencies, integrate with existing Python codebase
-**Confidence:** HIGH (all libraries officially supported, Raspberry Pi 3B+ compatible, Python 3.13 compatible)
+**New capabilities:** GPIO button/switch trigger, YAML configuration, random file selection, systemd auto-start
+**Stack additions:** gpiozero 2.0.1 (GPIO), PyYAML 6.0.2+ (config), stdlib only for file selection
+**Philosophy:** Minimal additions -- two new pip packages, zero new system services
+**Confidence:** MEDIUM-HIGH (gpiozero has a known open issue with lgpio button reliability on Pi 3B; mitigations documented)
+
+---
+
+## Existing Stack (DO NOT MODIFY)
+
+| Technology | Version | Purpose | Status |
+|------------|---------|---------|--------|
+| Python | 3.13.5 | Runtime | Validated v0.1 |
+| python-escpos | >=3.0 | USB thermal printer ESC/POS commands | Validated v0.1 |
+| pyusb | >=1.0 | USB communication backend | Validated v0.1 |
+| pytest | >=9.0 | Test framework | Validated v0.1 |
+| pytest-mock | >=3.14 | Test mocking | Validated v0.1 |
 
 ---
 
 ## New Stack Components
 
-### GPIO Button Handling
+### GPIO Button/Switch Handling
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| **gpiozero** | 2.0.1 | GPIO input device abstraction | Official Raspberry Pi Foundation library, high-level API simplifies button event detection, built-in debounce support, replaces deprecated RPi.GPIO |
-| **lgpio** (backend) | latest | Low-level GPIO access | Required backend for gpiozero on modern Raspberry Pi OS, kernel-level GPIO operations |
+| **gpiozero** | 2.0.1 | GPIO input device abstraction | Official Raspberry Pi Foundation library. High-level API with `Button` class, built-in `when_pressed`/`when_released` callbacks, software debounce via `bounce_time`. Replaces deprecated RPi.GPIO. |
+| **lgpio** (backend) | 0.2.2.0 (system) | Low-level GPIO access | Required backend for gpiozero on Bookworm. Pre-installed via `python3-lgpio` apt package. Talks to `/dev/gpiochip0` kernel interface. |
 
-**Rationale:**
-- gpiozero is the official 2026 recommendation from Raspberry Pi engineers ([gpiozero documentation](https://gpiozero.readthedocs.io/))
-- RPi.GPIO is deprecated and doesn't work on Raspberry Pi 5; gpiozero ensures future compatibility ([Raspberry Pi Forums](https://forums.raspberrypi.com/viewtopic.php?t=376663))
-- Clean event-driven API: `button.when_pressed = callback` vs manual polling ([gpiozero recipes](https://gpiozero.readthedocs.io/en/stable/recipes.html))
-- Built-in `bounce_time` parameter handles switch debouncing in software ([gpiozero API docs](https://gpiozero.readthedocs.io/en/stable/api_input.html))
-- Python 3.9+ support confirmed; works with Python 3.13 ([gpiozero PyPI](https://pypi.org/project/gpiozero/))
+**Why gpiozero over alternatives:**
+
+- RPi.GPIO is broken on kernel 6.6+ (current Bookworm default). `GPIO.add_event_detect()` raises `RuntimeError: Failed to add edge detection` due to removal of downstream GPIO sysfs patch. ([GitHub raspberrypi/linux #6037](https://github.com/raspberrypi/linux/issues/6037))
+- gpiozero is the official Raspberry Pi recommendation for 2024+. RPi Ltd has stated they "never supported" RPi.GPIO. ([gpiozero docs](https://gpiozero.readthedocs.io/en/stable/))
+- pigpio requires a running daemon (`pigpiod`), adding unnecessary complexity for a simple button input.
+- Direct lgpio usage is too low-level for button debounce/callback patterns that gpiozero provides out of the box.
+
+**Known issue -- IMPORTANT:**
+gpiozero issue [#1090](https://github.com/gpiozero/gpiozero/issues/1090) (OPEN as of 2026-03-19): Button events with `LGPIOFactory` (the default on Bookworm) are sometimes unreliable on Pi 3B, with phantom triggers and missed presses. The issue was filed against Pi 400 and Pi 3B.
+
+**Mitigations for issue #1090:**
+1. Use generous `bounce_time` (0.1-0.3s) instead of tight values (0.05s)
+2. Implement application-level cooldown (5s default per PROJECT.md) which masks any phantom triggers
+3. Add software debounce in the callback itself as a safety net
+4. If lgpio proves unreliable in testing, fall back to polling `button.is_pressed` in a loop (less elegant but fully reliable)
+5. The RPiGPIOFactory fallback is NOT viable on kernel 6.6+ because RPi.GPIO edge detection is broken
+
+**Confidence:** MEDIUM -- gpiozero is the right choice (only viable option), but button reliability with lgpio on Pi 3B needs validation during implementation.
 
 **Integration with existing code:**
 ```python
 from gpiozero import Button
-from src.printer import print_file
+from signal import pause
 
-def handle_button_press():
-    print_file("/GEN26_BILLPRINTER/wish1.png")
+def on_trigger():
+    # Call existing print pipeline
+    from src.printer import print_file
+    print_file(random_filename, source_folder)
 
-button = Button(17, bounce_time=0.05)  # GPIO 17, 50ms debounce
-button.when_pressed = handle_button_press
+button = Button(17, bounce_time=0.3, pull_up=True)
+button.when_pressed = on_trigger
+pause()  # Keep process alive for callbacks
 ```
 
-### Web Server
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **Flask** | 3.1.3 | Lightweight web framework | Minimal, Python-native, official Python 3.9+ support, 2026-current release, micro-framework philosophy matches simple single-button UI |
-| **Waitress** | latest | Production WSGI server | Pure Python (no compilation), Windows/Linux compatible, single-process multi-threaded (low memory footprint on Pi 3B+), officially documented Flask deployment method |
-
-**Rationale:**
-- Flask 3.1.3 released Feb 2026, actively maintained, Python 3.13 compatible ([Flask PyPI](https://pypi.org/project/Flask/))
-- Micro-framework design: minimal boilerplate for single-page interface ([Flask documentation](https://flask.palletsprojects.com/))
-- Waitress chosen over Gunicorn because it's pure Python (no C compilation), lower resource usage on constrained devices ([Flask deployment docs](https://flask.palletsprojects.com/en/stable/deploying/waitress/))
-- Gunicorn doesn't support Windows (irrelevant here) but has higher memory overhead due to pre-fork worker model ([Gunicorn vs Waitress comparison](https://stackshare.io/stackups/gunicorn-vs-waitress))
-- **CRITICAL:** Never use Flask development server (`app.run()`) in production — it's insecure, single-threaded, exposes debug info ([Flask deployment security](https://flask.palletsprojects.com/en/stable/deploying/))
-
-**Integration with existing code:**
+**Switch mode (toggle) support:**
 ```python
-from flask import Flask, render_template
-from src.printer import print_file
-
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return render_template('button.html')
-
-@app.route('/print', methods=['POST'])
-def trigger_print():
-    print_file("/GEN26_BILLPRINTER/wish1.png")
-    return {"status": "success"}
-
-# Production: waitress-serve --host=0.0.0.0 --port=8080 app:app
+# For switch/toggle mode: detect both transitions
+button = Button(17, bounce_time=0.3, pull_up=True)
+button.when_pressed = on_switch_on    # Switch flipped to ON
+button.when_released = on_switch_off  # Switch flipped to OFF
 ```
 
-### WiFi Access Point
+### YAML Configuration
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| **NetworkManager** (nmcli) | system | WiFi AP configuration | Native to Raspberry Pi OS Bookworm, replaces legacy hostapd/dnsmasq stack, single command AP setup, built-in DHCP/DNS |
-| **WPA2-PSK** | - | WiFi security | Maximum compatibility with Android/iOS, WPA3 not supported on Pi 3B+, CCMP encryption standard |
+| **PyYAML** | >=6.0.2 | YAML config file parsing | De facto standard Python YAML library. MIT licensed. Python 3.13 support confirmed in 6.0.2+. `safe_load()` prevents arbitrary code execution. Human-friendly format for Pi users editing config on-device via nano/vim. |
 
-**Rationale:**
-- NetworkManager is default on Raspberry Pi OS Bookworm (2023+), replacing dhcpcd/wpa_supplicant ([Raspberry Pi Forums](https://forums.raspberrypi.com/viewtopic.php?t=357998))
-- Single `nmcli` command creates AP vs multi-service hostapd/dnsmasq configuration ([nmcli WiFi guide](https://www.jeffgeerling.com/blog/2023/nmcli-wifi-on-raspberry-pi-os-12-bookworm))
-- Built-in IPv4 sharing mode (`ipv4.method shared`) provides DHCP automatically ([NetworkManager hotspot setup](https://waltsworkbench.com/securing-a-wifi-hotspot-with-wpa2-using-networkmanager-on-a-raspberry-pi-running-bookworm-aka-debian-12/))
-- 2.4GHz band (bg) for maximum device compatibility; 5GHz (a) not universally supported on older phones ([RaspberryTips AP guide](https://raspberrytips.com/access-point-setup-raspberry-pi/))
-- **IMPORTANT:** Must specify band explicitly (`802-11-wireless.band bg`) — "automatic" causes connection failures ([Raspberry Pi Forums](https://forums.raspberrypi.com/viewtopic.php?t=357998))
+**Why PyYAML:**
+- Only mature YAML library for Python. 6.0.2 added Python 3.13 support, 6.0.3 added Python 3.14 support. ([PyYAML PyPI](https://pypi.org/project/PyYAML/))
+- `yaml.safe_load()` is the correct function -- never use `yaml.load()` which allows arbitrary code execution. ([PyYAML deprecation wiki](https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation))
+- YAML chosen over JSON (no comments, less human-readable) and INI (no nested structures, weaker typing). This aligns with PROJECT.md key decision.
+- Zero dependencies -- PyYAML is self-contained.
 
-**No additional Python packages required** — system configuration only.
+**Why NOT alternatives:**
+- `tomllib` (stdlib in 3.11+): Read-only, TOML less familiar to Pi hobbyists than YAML.
+- `strictyaml`: Adds type validation but is an extra dependency with smaller community.
+- `ruamel.yaml`: More features than needed, heavier, and preserves comments (unnecessary for this use case).
+- JSON: No comments. Users editing config on a headless Pi need inline documentation.
 
-**Setup command:**
-```bash
-sudo nmcli con add type wifi ifname wlan0 mode ap con-name ducky-ap \
-  ssid "DuckyPrinter" \
-  802-11-wireless.band bg \
-  802-11-wireless.channel 6 \
-  wifi-sec.key-mgmt wpa-psk \
-  wifi-sec.psk "your-password-here" \
-  ipv4.method shared \
-  ipv4.address 192.168.4.1/24 \
-  ipv6.method disabled \
-  autoconnect true
+**Confidence:** HIGH -- PyYAML is battle-tested, well-maintained, fully compatible.
+
+**Integration pattern:**
+```python
+import yaml
+from pathlib import Path
+
+DEFAULT_CONFIG = {
+    "gpio_pin": 17,
+    "trigger_mode": "button",       # "button" or "switch"
+    "switch_trigger": "both",       # "both", "on_only", "off_only"
+    "cooldown_seconds": 5,
+    "bounce_time": 0.3,
+    "source_folder": "/home/admin/ducky-printer-project/print_files",
+}
+
+def load_config(path: Path) -> dict:
+    with open(path, "r") as f:
+        user_config = yaml.safe_load(f) or {}
+    config = {**DEFAULT_CONFIG, **user_config}
+    return config
 ```
+
+### Random File Selection
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **random** (stdlib) | built-in | Random file selection | `random.choice()` for uniform random selection from file list. No external dependency needed. |
+| **pathlib** (stdlib) | built-in | File system operations | `Path.glob()` for listing files by extension pattern. Modern, clean API. Already implicit in python-escpos usage patterns. |
+
+**No new packages required.** The stdlib `random` module with `os`/`pathlib` for directory listing covers this completely.
+
+**Why NOT alternatives:**
+- `secrets.choice()`: Cryptographic randomness unnecessary for file selection.
+- Weighted random: Over-engineered. Uniform random is the expected behavior.
+
+**Confidence:** HIGH -- stdlib, zero risk.
+
+**Integration pattern:**
+```python
+import random
+from pathlib import Path
+
+SUPPORTED_EXTENSIONS = {".txt", ".png", ".jpg", ".jpeg", ".bmp"}
+
+def pick_random_file(folder: str) -> Path:
+    source = Path(folder)
+    files = [f for f in source.iterdir()
+             if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS]
+    if not files:
+        raise FileNotFoundError(f"No printable files in {folder}")
+    return random.choice(files)
+```
+
+### systemd Service
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **systemd** | system | Auto-start on boot, process management | Native to Raspberry Pi OS Bookworm. Handles restart-on-failure, logging (journalctl), boot ordering. Zero Python dependencies. |
+
+**No Python packages required.** systemd is configured via a `.service` unit file only.
+
+**Why systemd over alternatives:**
+- `crontab @reboot`: No process management, no restart-on-failure, no logging integration.
+- `rc.local`: Deprecated on modern Debian/Bookworm systems.
+- `supervisor`: Extra dependency when systemd is already available and standard.
+- `screen`/`tmux`: Manual, not automatic, requires SSH.
+
+**Confidence:** HIGH -- standard Linux service management, well-documented for Pi.
+
+**Critical configuration for GPIO access:**
+```ini
+[Unit]
+Description=Ducky Thermal Printer GPIO Trigger
+Wants=dev-gpiochip0.device
+After=dev-gpiochip0.device multi-user.target
+ConditionPathExists=/dev/gpiochip0
+
+[Service]
+Type=simple
+User=admin
+SupplementaryGroups=gpio
+Environment=GPIOZERO_PIN_FACTORY=lgpio
+ExecStart=/usr/bin/python3 -m src.gpio_listener
+WorkingDirectory=/home/admin/ducky-printer-project
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+PrivateDevices=no
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Key details:**
+- `Wants=dev-gpiochip0.device` + `After=dev-gpiochip0.device`: Ensures GPIO hardware is available before starting. Without this, the service may start before `/dev/gpiochip0` exists and crash.
+- `SupplementaryGroups=gpio`: Grants GPIO device access without running as root.
+- `PrivateDevices=no`: Required so the service can access `/dev/gpiochip0` and `/dev/gpiomem`.
+- `Environment=GPIOZERO_PIN_FACTORY=lgpio`: Explicit pin factory selection.
+- `KillSignal=SIGINT`: Sends Ctrl+C to Python for graceful `signal.pause()` exit.
+- `Restart=on-failure` + `RestartSec=5`: Auto-restart on crash with 5s delay.
+- `Type=simple`: Correct for a long-running `signal.pause()` process.
 
 ---
 
 ## Installation
 
-### System Dependencies (one-time)
+### System Dependencies (one-time, likely already present)
 ```bash
-# GPIO library (may be pre-installed on Raspberry Pi OS)
-sudo apt-get update
-sudo apt-get install -y python3-lgpio
-
-# NetworkManager (pre-installed on Bookworm, verify)
-which nmcli || sudo apt-get install -y network-manager
+# lgpio (pre-installed on Bookworm, verify)
+dpkg -l | grep python3-lgpio || sudo apt-get install -y python3-lgpio
 ```
 
 ### Python Packages (add to requirements.txt)
-```bash
-# GPIO control library (official Raspberry Pi recommendation for 2026)
-gpiozero==2.0.1
+```
+# GPIO control library (official Raspberry Pi recommendation)
+gpiozero>=2.0.1
 
-# Lightweight web framework for single-button interface
-Flask==3.1.3
-
-# Production WSGI server (pure Python, low memory footprint)
-waitress>=3.0.2
+# YAML configuration file parsing
+PyYAML>=6.0.2
 ```
 
-### Full Installation
+### Virtual Environment Setup
 ```bash
-# Install Python dependencies
+# CRITICAL: Use --system-site-packages to inherit system lgpio
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Configure WiFi AP (one-time, persists across reboots)
-sudo nmcli con add type wifi ifname wlan0 mode ap con-name ducky-ap \
-  ssid "DuckyPrinter" \
-  802-11-wireless.band bg \
-  802-11-wireless.channel 6 \
-  wifi-sec.key-mgmt wpa-psk \
-  wifi-sec.psk "ducky2026" \
-  ipv4.method shared \
-  ipv4.address 192.168.4.1/24 \
-  ipv6.method disabled \
-  autoconnect true
-
-# Activate AP
-sudo nmcli con up ducky-ap
 ```
 
----
+**WARNING:** Creating a venv WITHOUT `--system-site-packages` will cause lgpio to be missing or install a broken PyPI version (0.0.0.2 instead of the working system 0.2.2.0). This causes `PinFactoryFallback` errors. ([Raspberry Pi Forums](https://forums.raspberrypi.com/viewtopic.php?t=358841))
 
-## Anti-Patterns to Avoid
-
-### ❌ Don't: Use Flask development server in production
-**Why:** Single-threaded, insecure, exposes debug info, crashes under load
-**Instead:** Use Waitress: `waitress-serve --host=0.0.0.0 --port=8080 app:app`
-
-### ❌ Don't: Use RPi.GPIO library
-**Why:** Deprecated, incompatible with Raspberry Pi 5, no future support
-**Instead:** Use gpiozero with lgpio backend
-
-### ❌ Don't: Omit band specification in NetworkManager AP
-**Why:** "automatic" band causes connection failures on many devices
-**Instead:** Explicitly set `802-11-wireless.band bg` for 2.4GHz
-
-### ❌ Don't: Use WPA3 on Raspberry Pi 3B+
-**Why:** Hardware doesn't support WPA3, causes devices to fail authentication
-**Instead:** Use WPA2-PSK (`wifi-sec.key-mgmt wpa-psk`)
-
-### ❌ Don't: Skip button debouncing
-**Why:** Physical switches bounce, causing multiple trigger events
-**Instead:** Set `bounce_time=0.05` (50ms typical for quality switches)
-
-### ❌ Don't: Run Flask with debug=True in production
-**Why:** Exposes interactive debugger with code execution capabilities
-**Instead:** Remove `debug=True` or set `FLASK_ENV=production`
-
-### ❌ Don't: Use legacy hostapd/dnsmasq on Bookworm
-**Why:** NetworkManager conflicts, deprecated workflow, more complex
-**Instead:** Use NetworkManager's native AP mode via nmcli
+### systemd Service Setup
+```bash
+sudo cp ducky-printer.service /etc/systemd/system/
+sudo chmod 644 /etc/systemd/system/ducky-printer.service
+sudo systemctl daemon-reload
+sudo systemctl enable ducky-printer.service
+sudo systemctl start ducky-printer.service
+```
 
 ---
 
@@ -191,39 +243,49 @@ sudo nmcli con up ducky-ap
 
 | Category | Recommended | Alternative | Why Not |
 |----------|-------------|-------------|---------|
-| GPIO | gpiozero 2.0.1 | RPi.GPIO | Deprecated, doesn't work on Pi 5, lower-level API |
-| GPIO | gpiozero 2.0.1 | pigpio | Requires daemon, more complex, overkill for simple button |
-| Web Framework | Flask 3.1.3 | Django | Too heavy for single-page app, database overhead |
-| Web Framework | Flask 3.1.3 | FastAPI | Async complexity unnecessary, larger dependencies |
-| Web Framework | Flask 3.1.3 | http.server (stdlib) | No routing, manual request parsing, production-unsuitable |
-| WSGI Server | Waitress | Gunicorn | Pre-fork model = higher memory, no Windows support |
-| WSGI Server | Waitress | uWSGI | Requires compilation, complex config, heavy for Pi 3B+ |
-| WiFi AP | NetworkManager | hostapd + dnsmasq | Multi-service complexity, conflicts with NetworkManager, deprecated workflow |
-| WiFi Security | WPA2-PSK | WPA3 | Pi 3B+ hardware doesn't support WPA3 |
-| WiFi Security | WPA2-PSK | Open (no password) | Security risk, no user expects open printer AP |
+| GPIO | gpiozero 2.0.1 | RPi.GPIO | Edge detection broken on kernel 6.6+ (current Bookworm). Dead project. |
+| GPIO | gpiozero 2.0.1 | pigpio | Requires daemon process. Overkill for single button. |
+| GPIO | gpiozero 2.0.1 | rpi-lgpio | Drop-in RPi.GPIO replacement using lgpio. Works, but lower-level API than gpiozero. No built-in Button class. |
+| GPIO | gpiozero 2.0.1 | Direct lgpio | No debounce, no callback helpers, manual pin management. |
+| Config | PyYAML 6.0.2+ | tomllib (stdlib) | Read-only (no write). TOML less familiar to Pi hobbyists. |
+| Config | PyYAML 6.0.2+ | JSON | No comments. Users need inline docs when editing on headless Pi. |
+| Config | PyYAML 6.0.2+ | INI/configparser | No nested structures, weak typing, no list support. |
+| Config | PyYAML 6.0.2+ | strictyaml | Extra dependency, smaller community, unnecessary for simple config. |
+| File select | random (stdlib) | secrets | Cryptographic randomness unnecessary. |
+| Service | systemd | crontab @reboot | No restart-on-failure, no logging, no process management. |
+| Service | systemd | supervisor | Extra dependency when systemd is native. |
 
 ---
 
-## Configuration Recommendations
+## Anti-Patterns to Avoid
 
-### GPIO Button
-- **Pin:** GPIO 17 (physical pin 11) — avoid special-purpose pins (I2C, SPI, UART)
-- **Pull resistor:** Use internal pull-up (`pull_up=True`, default) with button grounding the pin
-- **Debounce:** Start with 50ms (`bounce_time=0.05`), adjust if multiple triggers occur
-- **Hold time:** Consider `hold_time=2.0` if long-press needed for confirmation
+### Do NOT: Use RPi.GPIO on kernel 6.6+
+**Why:** `GPIO.add_event_detect()` raises RuntimeError. The GPIO sysfs interface it depends on was removed from the kernel.
+**Instead:** Use gpiozero with lgpio backend.
 
-### Web Interface
-- **Host:** `0.0.0.0` (all interfaces) — allows access via WiFi AP
-- **Port:** `8080` (non-privileged) — avoids needing root for port 80
-- **Workers:** Single process, 4 threads (Waitress default) — adequate for 1-5 concurrent users
-- **Timeout:** 30s request timeout — printing completes in <5s typically
+### Do NOT: Create venv without --system-site-packages
+**Why:** lgpio on PyPI (0.0.0.2) is broken. The working version (0.2.2.0) is installed via apt as `python3-lgpio`.
+**Instead:** Always use `python3 -m venv --system-site-packages`.
 
-### WiFi Access Point
-- **SSID:** `DuckyPrinter` — descriptive, unique
-- **Password:** Minimum 8 characters, WPA2 requirement
-- **Channel:** 1, 6, or 11 (non-overlapping 2.4GHz channels) — avoid interference
-- **IP Range:** `192.168.4.1/24` — avoids common router ranges (192.168.0.x, 192.168.1.x)
-- **Band:** `bg` (2.4GHz) — maximum compatibility vs `a` (5GHz, less compatible)
+### Do NOT: Use yaml.load() (without safe_load)
+**Why:** Allows arbitrary Python code execution from YAML files. Equivalent to `pickle.load()` in terms of security risk.
+**Instead:** Always use `yaml.safe_load()`.
+
+### Do NOT: Use tight bounce_time values (< 0.1s)
+**Why:** lgpio debounce works differently from RPi.GPIO. It waits for the signal to be STABLE for the specified duration, rather than suppressing edges within a window. Combined with issue #1090, tight values increase phantom trigger risk.
+**Instead:** Start with `bounce_time=0.3` and add application-level cooldown.
+
+### Do NOT: Run the systemd service as root
+**Why:** Unnecessary privilege escalation. GPIO access is available via the `gpio` group.
+**Instead:** Run as the application user with `SupplementaryGroups=gpio`.
+
+### Do NOT: Skip the `After=dev-gpiochip0.device` in systemd
+**Why:** The service may start before the GPIO device node exists, causing immediate crash + restart loop.
+**Instead:** Use `Wants=dev-gpiochip0.device` and `After=dev-gpiochip0.device`.
+
+### Do NOT: Use signal.pause() without SIGINT handling
+**Why:** systemd sends SIGTERM by default, but Python `signal.pause()` responds to SIGINT (Ctrl+C). Without `KillSignal=SIGINT` in the service file, shutdown may not be clean.
+**Instead:** Set `KillSignal=SIGINT` in the systemd unit, or handle SIGTERM explicitly in Python.
 
 ---
 
@@ -231,153 +293,124 @@ sudo nmcli con up ducky-ap
 
 | Component | Memory (MB) | CPU (idle) | Notes |
 |-----------|-------------|------------|-------|
-| gpiozero | <1 | <1% | Event-driven, sleeps between events |
-| Flask + Waitress | ~30-50 | <5% | Single process, 4 threads |
-| NetworkManager AP | ~10-20 | <2% | System service, already running |
-| **Total NEW** | ~40-70 | <8% | Acceptable on Pi 3B+ (1GB RAM, quad-core) |
+| gpiozero + lgpio | <1 | <1% | Event-driven via `signal.pause()`, sleeps between events |
+| PyYAML | <1 | 0% | One-time load at startup, then GC'd |
+| Python process | ~20-30 | <1% | Main loop is `signal.pause()`, nearly zero CPU |
+| **Total NEW** | ~20-30 | <2% | Negligible on Pi 3B+ (1GB RAM, quad-core) |
 
-**Baseline:** python-escpos + USB overhead ~20-40MB
-**v0.2 Total:** ~60-110MB (well within Pi 3B+ 1GB RAM)
+**v0.1 baseline:** python-escpos + USB overhead ~20-40MB (per-job, not persistent)
+**v0.2 persistent process:** ~20-30MB idle, spikes to ~50-70MB during print job
+
+---
+
+## Configuration Recommendations
+
+### GPIO Pin Selection
+- **Default:** GPIO 17 (physical pin 11) -- general purpose, no special function
+- **Avoid:** GPIO 2/3 (I2C), GPIO 14/15 (UART), GPIO 7-11 (SPI)
+- **Pull resistor:** Use internal pull-up (`pull_up=True`, gpiozero default) with button/switch grounding the pin
+- **Wiring:** Button connects GPIO pin to GND. No external resistor needed.
+
+### Debounce Strategy (layered)
+1. **Hardware:** Optional 0.1uF capacitor across button terminals
+2. **gpiozero:** `bounce_time=0.3` (300ms -- generous for reliability)
+3. **Application:** 5-second cooldown between print activations (per PROJECT.md requirement)
+
+### Config File Location
+- **Path:** `/home/admin/ducky-printer-project/config.yaml`
+- **Fallback:** Hardcoded defaults if file missing or malformed
+- **Permissions:** Readable by application user, writable for editing
+
+---
+
+## Version Compatibility Matrix
+
+| Component | Min Python | Tested Python | Raspberry Pi OS | Kernel | Notes |
+|-----------|------------|---------------|-----------------|--------|-------|
+| gpiozero 2.0.1 | 3.9 | 3.13 | Bookworm | 6.6+ | Pre-installed on Bookworm desktop |
+| PyYAML 6.0.2 | 3.8 | 3.13 | Any | Any | Pure Python fallback if C ext fails |
+| lgpio 0.2.2.0 | 3.9 | 3.13 | Bookworm | 6.6+ | System apt package only |
+| systemd | - | - | Bookworm | Any | Native, always available |
+
+**Current project:** Python 3.13.5 -- all components compatible.
+
+---
+
+## Migration Path (v0.1 to v0.2)
+
+### No Breaking Changes
+- Existing `src/printer.py`, `src/file_handler.py`, `src/print_job.py` **unchanged**
+- python-escpos integration **untouched**
+- CLI interface (`python3 -m src.print_job <filename>`) **preserved**
+
+### Additive Changes
+```
+ducky-printer-project/
+  src/
+    printer.py           # Existing (no changes)
+    file_handler.py      # Existing (no changes)
+    print_job.py         # Existing (no changes)
+    config.py            # NEW: YAML config loading with defaults
+    gpio_listener.py     # NEW: GPIO event loop with signal.pause()
+    file_selector.py     # NEW: Random file selection from folder
+  config.yaml            # NEW: User-editable configuration
+  ducky-printer.service  # NEW: systemd unit file
+```
+
+### New requirements.txt additions
+```
+gpiozero>=2.0.1
+PyYAML>=6.0.2
+```
 
 ---
 
 ## Testing Considerations
 
-### GPIO Button Testing
-- **Mock gpiozero in tests:** Use `pytest-mock` to mock `Button` class, avoid GPIO hardware dependency
-- **Test debounce logic:** Simulate rapid button presses, verify single callback execution
-- **Test button hold:** Mock `when_held` callback if implementing long-press
+### GPIO Testing (without hardware)
+- Mock `gpiozero.Button` in unit tests using `pytest-mock`
+- Test callback registration, debounce timing, cooldown logic
+- gpiozero provides `MockFactory` for testing: `from gpiozero.pins.mock import MockFactory`
 
-### Web Interface Testing
-- **Flask test client:** Use `app.test_client()` for route testing without server startup
-- **Mock printer calls:** Patch `print_file()` to avoid USB printer requirement in web tests
-- **CORS not needed:** Single-origin (AP-hosted), no cross-origin requests
+### YAML Config Testing
+- Test default values when config file missing
+- Test partial config (user overrides subset of defaults)
+- Test invalid YAML (malformed file) gracefully returns defaults
+- Test type validation (wrong types in config values)
 
-### Integration Testing
-- **End-to-end:** Requires real hardware (GPIO, USB printer, WiFi AP)
-- **Staging:** Test on spare Pi 3B+ before production deployment
-- **Network isolation:** AP mode doesn't require internet, simplifies testing
+### File Selection Testing
+- Test empty folder raises appropriate error
+- Test folder with non-printable files only
+- Test randomness (statistical distribution over many calls)
+- Test file extension filtering (case insensitive)
 
----
-
-## Security Notes
-
-### WiFi Access Point
-- **WPA2-PSK encryption:** Industry standard, supported by all modern devices
-- **Hidden SSID not recommended:** Security through obscurity, breaks device compatibility
-- **MAC filtering not implemented:** Low security value, high maintenance overhead
-- **No internet sharing:** `ipv4.method shared` provides DHCP but no NAT/routing (by design)
-
-### Web Interface
-- **No authentication:** Single-button interface, AP password provides physical access control
-- **No HTTPS:** Local network only, certificate management overhead unjustified
-- **CSRF not needed:** POST endpoint has no session/cookies, no persistent state
-- **Input validation:** Hardcoded file path (`wish1.png`), no user input to sanitize
-
-### General
-- **Principle of least privilege:** Web server runs as non-root user
-- **No remote access:** WiFi AP is isolated, no internet connection
-- **Physical security:** Raspberry Pi should be in secured location
-
----
-
-## Version Compatibility
-
-| Component | Min Python | Max Python | Raspberry Pi OS | Notes |
-|-----------|------------|------------|-----------------|-------|
-| gpiozero 2.0.1 | 3.9 | 3.13+ | Bookworm, Bullseye | Dropped Python 2.x in v2.0 |
-| Flask 3.1.3 | 3.9 | 3.13+ | Any | Dropped Python 3.8 in v3.1.0 |
-| Waitress 3.0.2 | 3.8 | 3.13+ | Any | Pure Python, platform-agnostic |
-| NetworkManager | - | - | Bookworm+ | Default since Bookworm (2023) |
-
-**Current project:** Python 3.13.5 ✅ All components compatible
-
----
-
-## Migration Path (v0.1 → v0.2)
-
-### No Breaking Changes
-- Existing `src/printer.py`, `src/file_handler.py`, `src/print_job.py` **unchanged**
-- python-escpos integration **untouched**
-- CLI interface **preserved**
-
-### Additive Changes
-```
-src/
-├── printer.py          # Existing (no changes)
-├── file_handler.py     # Existing (no changes)
-├── print_job.py        # Existing (no changes)
-├── triggers/           # NEW
-│   ├── gpio_trigger.py    # Button handler
-│   └── web_trigger.py     # Flask app
-└── config.py           # NEW (enable/disable triggers)
-```
-
-### Configuration System
-```python
-# config.py
-ENABLE_GPIO_BUTTON = True
-ENABLE_WEB_INTERFACE = True
-GPIO_PIN = 17
-WEB_PORT = 8080
-PRINT_FILE = "/GEN26_BILLPRINTER/wish1.png"
-```
-
----
-
-## Next Phase Considerations
-
-### What's NOT Included (Deliberately)
-- **Database:** No persistent state needed (stateless printing)
-- **Async framework:** Printing is synchronous I/O, no benefit from async
-- **ORM:** No database, no ORM needed
-- **Template engine beyond Jinja2:** Flask includes Jinja2, adequate for single button HTML
-- **CSS framework:** Single button doesn't justify Bootstrap/Tailwind overhead
-- **JavaScript framework:** Vanilla JS `fetch()` adequate for single POST request
-- **Logging framework:** Python `logging` stdlib sufficient
-- **Monitoring/metrics:** Out of scope for v0.2 POC
-
-### Future Extensibility
-If v0.3+ requires:
-- **File selection UI:** Flask + Jinja2 templates scale to multi-page forms
-- **Print queue:** Add lightweight job queue (e.g., `rq` with Redis)
-- **Remote management:** Add Flask-Login for authentication, HTTPS with Let's Encrypt
-- **Analytics:** Add lightweight SQLite logging via `sqlite3` stdlib
+### systemd Testing (on device)
+- `sudo systemctl status ducky-printer` -- verify running
+- `sudo journalctl -u ducky-printer -f` -- live log tailing
+- Kill process, verify auto-restart after 5s
+- Reboot, verify auto-start
 
 ---
 
 ## Sources
 
 ### Official Documentation
-- [gpiozero 2.0.1 Documentation](https://gpiozero.readthedocs.io/en/stable/)
-- [Flask 3.1.x Documentation](https://flask.palletsprojects.com/en/stable/)
-- [Flask Deployment - Waitress](https://flask.palletsprojects.com/en/stable/deploying/waitress/)
-- [Raspberry Pi Configuration](https://www.raspberrypi.com/documentation/computers/configuration.html)
+- [gpiozero 2.0.1 Documentation](https://gpiozero.readthedocs.io/en/stable/) -- HIGH confidence
+- [gpiozero Input Devices API](https://gpiozero.readthedocs.io/en/stable/api_input.html) -- HIGH confidence
+- [gpiozero Pin Factories API](https://gpiozero.readthedocs.io/en/stable/api_pins.html) -- HIGH confidence
+- [gpiozero FAQ](https://gpiozero.readthedocs.io/en/stable/faq.html) -- HIGH confidence
+- [PyYAML PyPI](https://pypi.org/project/PyYAML/) -- HIGH confidence
 
-### Library Information
-- [gpiozero PyPI](https://pypi.org/project/gpiozero/)
-- [Flask PyPI](https://pypi.org/project/Flask/)
-- [Flask Changelog](https://flask.palletsprojects.com/en/stable/changes/)
-
-### Tutorials & Guides
-- [gpiozero Basic Recipes](https://gpiozero.readthedocs.io/en/stable/recipes.html)
-- [gpiozero Button API](https://gpiozero.readthedocs.io/en/stable/api_input.html)
-- [Migrating from RPi.GPIO to gpiozero](https://gpiozero.readthedocs.io/en/stable/migrating_from_rpigpio.html)
-- [Build a Python Web Server with Flask](https://projects.raspberrypi.org/en/projects/python-web-server-with-flask)
-- [Securing WiFi Hotspot with WPA2 on Bookworm](https://waltsworkbench.com/securing-a-wifi-hotspot-with-wpa2-using-networkmanager-on-a-raspberry-pi-running-bookworm-aka-debian-12/)
-- [Turn Your Raspberry Pi into an Access Point (Bookworm Ready)](https://raspberrytips.com/access-point-setup-raspberry-pi/)
-- [nmcli for WiFi on Raspberry Pi OS Bookworm](https://www.jeffgeerling.com/blog/2023/nmcli-wifi-on-raspberry-pi-os-12-bookworm)
+### Known Issues (verified)
+- [gpiozero #1090: Button class broken with LGPIOFactory](https://github.com/gpiozero/gpiozero/issues/1090) -- OPEN, affects Pi 3B
+- [raspberrypi/linux #6037: GPIO.add_event_detect broken on kernel 6.6](https://github.com/raspberrypi/linux/issues/6037) -- Confirms RPi.GPIO is dead
+- [PyYAML yaml.load() Deprecation](https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation) -- Security guidance
 
 ### Community Resources
-- [Raspberry Pi Forums - GPIO Libraries](https://forums.raspberrypi.com/viewtopic.php?t=376663)
-- [Raspberry Pi Forums - NetworkManager Hotspot](https://forums.raspberrypi.com/viewtopic.php?t=357998)
-- [gpiozero vs RPi.GPIO Discussion](https://forums.raspberrypi.com/viewtopic.php?t=204466)
-- [Gunicorn vs Waitress Comparison](https://stackshare.io/stackups/gunicorn-vs-waitress)
-
-### Technical Articles
-- [Why GPIO Zero Is Better Than RPi.GPIO](https://www.makeuseof.com/tag/gpio-zero-raspberry-pi/)
-- [Flask Deployment Security Considerations](https://flask.palletsprojects.com/en/stable/deploying/)
-- [GPIO Programming on Raspberry Pi - Python Libraries](https://medium.com/geekculture/gpio-programming-on-the-raspberry-pi-python-libraries-e12af7e0a812)
+- [lgpio in virtual environments](https://forums.raspberrypi.com/viewtopic.php?t=358841) -- Confirms --system-site-packages requirement
+- [systemd service with GPIO permissions](https://forums.raspberrypi.com/viewtopic.php?p=2339274) -- Service file template with gpiochip ordering
+- [RPi.GPIO broken on Bookworm kernel 6.6](https://forums.raspberrypi.com/viewtopic.php?t=372507) -- Confirms edge detection failure
+- [rpi-lgpio as RPi.GPIO replacement](https://rpi-lgpio.readthedocs.io/en/latest/differences.html) -- Alternative if needed
 
 ---
 
@@ -385,27 +418,33 @@ If v0.3+ requires:
 
 | Area | Confidence | Rationale |
 |------|------------|-----------|
-| GPIO (gpiozero) | **HIGH** | Official Raspberry Pi documentation, active maintenance, 2026-current recommendation |
-| Web (Flask) | **HIGH** | v3.1.3 released Feb 2026, official Python 3.13 support, widespread production use |
-| WSGI (Waitress) | **HIGH** | Officially documented Flask deployment method, pure Python compatibility verified |
-| WiFi AP (NetworkManager) | **MEDIUM-HIGH** | Default Bookworm method, some users report connection issues (band config resolves) |
-| Python 3.13 compatibility | **HIGH** | All libraries explicitly support Python 3.9+, 3.13.5 verified on device |
-| Raspberry Pi 3B+ compatibility | **HIGH** | All libraries widely used on Pi 3B+, no Pi 5-specific requirements |
-
-**Overall Confidence:** HIGH — Stack validated with official sources, version compatibility confirmed, platform requirements met.
+| GPIO (gpiozero) | **MEDIUM** | Correct library choice (only viable option), but open issue #1090 means button reliability on Pi 3B needs validation. Mitigations documented. |
+| YAML (PyYAML) | **HIGH** | Battle-tested, Python 3.13 compatible, no known issues. |
+| File selection (stdlib) | **HIGH** | Standard library, zero risk. |
+| systemd service | **HIGH** | Well-documented pattern, community-verified GPIO ordering config. |
+| Virtual env + lgpio | **MEDIUM-HIGH** | Requires `--system-site-packages` workaround. Well-documented but easy to get wrong. |
+| Overall | **MEDIUM-HIGH** | GPIO reliability is the only open question. Everything else is straightforward. |
 
 ---
 
 ## Decision Summary
 
-**For v0.2 milestone, add three focused libraries:**
+**For v0.2 milestone, add two new pip packages:**
 
-1. **gpiozero 2.0.1** — GPIO button events (official 2026 recommendation)
-2. **Flask 3.1.3** — Lightweight web framework (single-page interface)
-3. **Waitress 3.0.2+** — Production WSGI server (low-resource footprint)
+1. **gpiozero >=2.0.1** -- GPIO button/switch events (official recommendation, only viable option on kernel 6.6+)
+2. **PyYAML >=6.0.2** -- YAML configuration loading
 
-**NetworkManager (system-level)** — WiFi AP configuration (no Python packages)
+**Use stdlib for:**
+- `random.choice()` for file selection
+- `pathlib.Path` for file system operations
+- `signal.pause()` for main event loop
 
-**Total new dependencies:** 3 Python packages, ~40-70MB RAM footprint
+**Use system-level:**
+- `lgpio` 0.2.2.0 via `python3-lgpio` apt package (GPIO backend)
+- `systemd` for service management
+
+**Total new pip dependencies:** 2 packages
+**Total new RAM footprint:** ~20-30MB idle
 **Integration:** Zero breaking changes to existing v0.1 code
-**Philosophy:** Minimal, lightweight, official, well-documented, Raspberry Pi-optimized
+
+**Critical validation needed:** GPIO button reliability with lgpio on Pi 3B+ (issue #1090). Plan fallback to polling-based approach if event callbacks prove unreliable.
