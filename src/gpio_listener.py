@@ -62,8 +62,8 @@ def start_gpio_listener(config: PrinterConfig):
     """
     global _last_trigger_time
 
-    # Reset cooldown state for new listener
-    _last_trigger_time = None
+    # Preserve cooldown state across config reloads (don't reset _last_trigger_time)
+    # This ensures cooldown enforcement continues even after hot-reload
 
     # Set pin factory for Pi 3B+ compatibility
     if LGPIOFactory is not None:
@@ -80,9 +80,8 @@ def start_gpio_listener(config: PrinterConfig):
             if config.cooldown_seconds > 0 and _last_trigger_time is not None:
                 elapsed = current_time - _last_trigger_time
                 if elapsed < config.cooldown_seconds:
-                    logger.debug(
-                        f"GPIO event ignored (within cooldown: {elapsed:.2f}s < "
-                        f"{config.cooldown_seconds}s)"
+                    logger.info(
+                        f"Button press ignored - cooldown active ({elapsed:.1f}s / {config.cooldown_seconds}s)"
                     )
                     return
 
