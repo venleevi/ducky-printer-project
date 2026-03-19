@@ -73,10 +73,10 @@ Plans:
   1. A print trigger picks a random file and sends it to the printer through the existing v0.1 pipeline
   2. Printer errors (USB disconnected, paper out, device busy) are logged but do not crash the listener process
   3. File picker errors (empty folder, missing folder) are logged but do not crash the listener process
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Error-resilient trigger handler with comprehensive exception handling (PrinterError, FileError, no-files-available)
 
 ### Phase 5: GPIO Listener
 **Goal**: Physical button press or switch flip triggers a print with debounce and cooldown protection
@@ -115,11 +115,11 @@ Plans:
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
 | 2. Configuration Foundation | v0.2 | 2/2 | Complete | 2026-03-19 |
 | 3. File Selection | v0.2 | Complete    | 2026-03-19 | 2026-03-19 |
-| 4. Trigger Handler | v0.2 | 0/? | Not started | - |
+| 4. Trigger Handler | v0.2 | 0/1 | Not started | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
 | 6. Service Deployment | v0.2 | 0/? | Not started | - |
 
 ---
 
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-19 (Phase 3 complete — random file selector with 16 tests, all passing)*
+*Last updated: 2026-03-19 (Phase 4 planned — error-resilient trigger handler with 1 TDD plan)*
