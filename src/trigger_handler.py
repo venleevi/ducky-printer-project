@@ -13,6 +13,7 @@ from src.config.schema import PrinterConfig
 from src.file_selector import select_random_printable_file
 from src.printer import print_file, PrinterError
 from src.file_handler import FileError
+from src.print_logger import log_print_event
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ def handle_print_trigger(config: PrinterConfig) -> bool:
         # Handle no files available (FILE-03 requirement)
         if file_path is None:
             logger.warning(f"No printable files available in {config.source_folder}")
+            log_print_event(success=False, error_message="No printable files available")
             return False
 
         # Print file with default settings
@@ -63,25 +65,30 @@ def handle_print_trigger(config: PrinterConfig) -> bool:
                 target_height_cm=100.0  # Large height = no vertical constraint
             )
             logger.info(f"Print triggered successfully: {file_path}")
+            log_print_event(success=True, file_path=str(file_path))
             return True
 
         except PrinterError as e:
             # USB disconnected, device busy, etc. (GPIO-05)
             logger.error(f"Print failed: {e}")
+            log_print_event(success=False, file_path=str(file_path), error_message=f"PrinterError: {e}")
             return False
 
         except FileError as e:
             # File read failed (GPIO-05)
             logger.error(f"File read failed: {e}")
+            log_print_event(success=False, file_path=str(file_path), error_message=f"FileError: {e}")
             return False
 
         except ValueError as e:
             # Unsupported file type (GPIO-05)
             logger.error(f"Unsupported file type: {e}")
+            log_print_event(success=False, file_path=str(file_path), error_message=f"ValueError: {e}")
             return False
 
     except Exception as e:
         # Catch-all for unexpected errors (GPIO-05 safety net)
         # Uses logger.exception to include stack trace for debugging
         logger.exception(f"Unexpected error in print trigger: {e}")
+        log_print_event(success=False, error_message=f"Unexpected error: {e}")
         return False
