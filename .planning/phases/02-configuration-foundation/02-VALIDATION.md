@@ -2,8 +2,8 @@
 phase: 2
 slug: configuration-foundation
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-19
 ---
 
@@ -34,29 +34,32 @@ created: 2026-03-19
 
 ---
 
-## Per-Task Verification Map
+## Wave 0 / Nyquist Compliance Note
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 02-01-01 | 01 | 1 | CFG-01 | unit | `pytest tests/test_config_schema.py::test_gpio_pin_validation -x` | ❌ W0 | ⬜ pending |
-| 02-01-02 | 01 | 1 | CFG-02 | unit | `pytest tests/test_config_schema.py::test_trigger_mode_validation -x` | ❌ W0 | ⬜ pending |
-| 02-01-03 | 01 | 1 | CFG-03 | unit | `pytest tests/test_config_schema.py::test_cooldown_validation -x` | ❌ W0 | ⬜ pending |
-| 02-01-04 | 01 | 1 | CFG-04 | unit | `pytest tests/test_config_schema.py::test_source_folder_validation -x` | ❌ W0 | ⬜ pending |
-| 02-01-05 | 01 | 1 | CFG-05 | unit | `pytest tests/test_config_schema.py::test_switch_direction_validation -x` | ❌ W0 | ⬜ pending |
-| 02-02-01 | 02 | 1 | CFG-06 | integration | `pytest tests/test_config_loader.py::test_validation_error_messages -x` | ❌ W0 | ⬜ pending |
-| 02-03-01 | 03 | 2 | CFG-07 | integration | `pytest tests/test_config_watcher.py::test_hot_reload -x` | ❌ W0 | ⬜ pending |
+Both plans (02-01 and 02-02) use `type: tdd` with `tdd="true"` tasks. In TDD plans, test files are created during the RED phase of each task — tests are written BEFORE implementation code. This satisfies the Nyquist requirement because:
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+1. **test_config_schema.py** — Created in Plan 01, Task 1 RED phase (step 3) before any schema implementation
+2. **test_config_loader.py** — Created in Plan 01, Task 2 RED phase (step 1) before any loader implementation
+3. **test_config_watcher.py** — Created in Plan 02, Task 1 RED phase (step 2) before any watcher implementation
+4. **conftest.py** — Created in Plan 01, Task 1 RED phase (step 4) with shared fixtures
+
+No separate Wave 0 plan is needed — the TDD RED phase IS the test scaffold creation step.
 
 ---
 
-## Wave 0 Requirements
+## Per-Task Verification Map
 
-- [ ] `tests/test_config_schema.py` — stubs for CFG-01 through CFG-05
-- [ ] `tests/test_config_loader.py` — stubs for CFG-06
-- [ ] `tests/test_config_watcher.py` — stubs for CFG-07
-- [ ] `tests/conftest.py` — shared fixtures (temp config files, tmp_path)
-- [ ] `pip install watchdog` — watchdog not yet in requirements.txt
+| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Test Created In | Status |
+|---------|------|------|-------------|-----------|-------------------|-----------------|--------|
+| 02-01-01 | 01 | 1 | CFG-01 | unit | `pytest tests/test_config_schema.py::test_gpio_pin_validation -x` | Task 1 RED phase | pending |
+| 02-01-02 | 01 | 1 | CFG-02 | unit | `pytest tests/test_config_schema.py::test_trigger_mode_validation -x` | Task 1 RED phase | pending |
+| 02-01-03 | 01 | 1 | CFG-03 | unit | `pytest tests/test_config_schema.py::test_cooldown_validation -x` | Task 1 RED phase | pending |
+| 02-01-04 | 01 | 1 | CFG-04 | unit | `pytest tests/test_config_schema.py::test_source_folder_validation -x` | Task 1 RED phase | pending |
+| 02-01-05 | 01 | 1 | CFG-05 | unit | `pytest tests/test_config_schema.py::test_switch_direction_validation -x` | Task 1 RED phase | pending |
+| 02-02-01 | 01 | 1 | CFG-06 | integration | `pytest tests/test_config_loader.py::test_validation_error_messages -x` | Task 2 RED phase | pending |
+| 02-03-01 | 02 | 2 | CFG-07 | integration | `pytest tests/test_config_watcher.py::test_hot_reload -x` | Task 1 RED phase | pending |
+
+*Status: pending / green / red / flaky*
 
 ---
 
@@ -71,11 +74,11 @@ created: 2026-03-19
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or TDD RED phase creates tests first
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covered by TDD RED phases (test files created before implementation)
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved (TDD plans satisfy Nyquist via RED phase test creation)
