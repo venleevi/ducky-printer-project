@@ -30,7 +30,7 @@
 **Milestone Goal:** Physical button or switch connected to Raspberry Pi GPIO triggers printing a random file from a configurable folder, running as a systemd service.
 
 - [x] **Phase 2: Configuration Foundation** - YAML config system with validation, defaults, and hot-reload (COMPLETE 2026-03-19)
-- [ ] **Phase 3: File Selection** - Random file picker from configurable source folder with type filtering
+- [x] **Phase 3: File Selection** - Random file picker from configurable source folder with type filtering (COMPLETE 2026-03-19)
 - [ ] **Phase 4: Trigger Handler** - Integration seam between event sources and print pipeline with error resilience
 - [ ] **Phase 5: GPIO Listener** - Button and switch mode GPIO input with debounce and cooldown
 - [ ] **Phase 6: Service Deployment** - systemd service, usblp blacklist, journald logging
@@ -63,7 +63,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 03-01-PLAN.md — Random file selector with pathlib filtering, case-insensitive extension matching, and graceful empty folder handling
+- [x] 03-01-PLAN.md — Random file selector with pathlib filtering, case-insensitive extension matching, and graceful empty folder handling (COMPLETE)
 
 ### Phase 4: Trigger Handler
 **Goal**: A single integration point orchestrates file selection and printing, handling all errors gracefully without crashing the daemon
@@ -114,7 +114,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
 | 2. Configuration Foundation | v0.2 | 2/2 | Complete | 2026-03-19 |
-| 3. File Selection | v0.2 | 0/1 | Not started | - |
+| 3. File Selection | v0.2 | 1/1 | Complete | 2026-03-19 |
 | 4. Trigger Handler | v0.2 | 0/? | Not started | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
 | 6. Service Deployment | v0.2 | 0/? | Not started | - |
@@ -122,4 +122,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-19 (Phase 3 planned — 1 TDD plan for file selector with 14 tests)*
+*Last updated: 2026-03-19 (Phase 3 complete — random file selector with 16 tests, all passing)*

@@ -27,9 +27,9 @@ Requirements for GPIO Print Trigger milestone. Each maps to roadmap phases.
 
 ### File Selection
 
-- [ ] **FILE-01**: System picks a random file from the configured source folder on each activation
-- [ ] **FILE-02**: System filters to supported file types (.txt, .png, .jpg, .bmp)
-- [ ] **FILE-03**: Empty source folder logs warning instead of crashing
+- [x] **FILE-01**: System picks a random file from the configured source folder on each activation
+- [x] **FILE-02**: System filters to supported file types (.txt, .png, .jpg, .bmp)
+- [x] **FILE-03**: Empty source folder logs warning instead of crashing
 
 ### Deployment
 
@@ -79,9 +79,9 @@ Requirements for GPIO Print Trigger milestone. Each maps to roadmap phases.
 | GPIO-03 | Phase 5 | Pending |
 | GPIO-04 | Phase 5 | Pending |
 | GPIO-05 | Phase 4 | Pending |
-| FILE-01 | Phase 3 | Pending |
-| FILE-02 | Phase 3 | Pending |
-| FILE-03 | Phase 3 | Pending |
+| FILE-01 | Phase 3 | Complete |
+| FILE-02 | Phase 3 | Complete |
+| FILE-03 | Phase 3 | Complete |
 | DEPLOY-01 | Phase 6 | Pending |
 | DEPLOY-02 | Phase 6 | Pending |
 | DEPLOY-03 | Phase 6 | Pending |

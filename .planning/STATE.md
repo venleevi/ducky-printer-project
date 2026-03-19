@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: GPIO Print Trigger
 status: in_progress
-last_updated: "2026-03-19T22:00:00.000Z"
+last_updated: "2026-03-19T19:41:48.860Z"
 progress:
-  total_phases: 5
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 6
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
 ---
 
 # Project State
@@ -17,12 +17,12 @@ progress:
 
 **Core Value**: User presses a physical button and a random file prints on the thermal printer
 
-**Current Focus**: v0.2 Phase 2 — Configuration Foundation
+**Current Focus**: v0.2 Phase 3 — File Selection
 
 ## Current Position
 
-Phase: 02 (configuration-foundation) — COMPLETE
-Next Phase: 03 (file-selection) — READY TO START
+Phase: 03 (file-selection) — COMPLETE
+Next Phase: 04 (trigger-handler) — READY TO START
 
 ## Completed Milestones
 
@@ -52,6 +52,14 @@ Next Phase: 03 (file-selection) — READY TO START
 - watchdog-based hot-reload with 1s debouncing and error resilience
 - 35 tests covering schema, loader, and watcher (all passing)
 
+### Phase 03 Complete (2026-03-19)
+
+- Set literal for SUPPORTED_EXTENSIONS (faster membership testing)
+- Return None for empty folder (explicit null handling for caller)
+- No recursive scanning - only source folder directly (simple and predictable)
+- Case-insensitive extension matching via .suffix.lower() (user-friendly)
+- 16 tests covering random selection, extension filtering, empty folder handling (all passing)
+
 ## Performance Metrics
 
 ### v0.1 POC (Complete)
@@ -71,8 +79,10 @@ Next Phase: 03 (file-selection) — READY TO START
 |-------|------|----------|-------|-------|-----------|
 | 02 | 01 | 45m | 8 | 2 | 2026-03-19 |
 | 02 | 02 | 50m | 4 | 1 | 2026-03-19 |
+| 03 | 01 | 3m | 2 | 2 | 2026-03-19 |
 
 **Phase 02 Total Duration:** ~95 minutes
+**Phase 03 Total Duration:** ~3 minutes
 
 ## Blockers/Concerns
 
@@ -81,9 +91,9 @@ Next Phase: 03 (file-selection) — READY TO START
 
 ## Session Continuity
 
-**Next Action**: Plan Phase 3 (File Selection) - random file picker with type filtering from configured source folder
+**Next Action**: Plan Phase 4 (Trigger Handler) - integration seam between file selection and print pipeline with error resilience
 
 ---
 
 *State initialized: 2026-03-13*
-*Last updated: 2026-03-19 after v0.2 roadmap creation*
+*Last updated: 2026-03-19 after Phase 03 completion*
