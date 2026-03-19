@@ -10,3 +10,9 @@ pytest>=9.0
 
 # Mock object library for pytest - allows mocking USB hardware in tests
 pytest-mock>=3.14
+
+# Data validation with type hints and runtime checking
+pydantic>=2.0
+
+# YAML parsing for configuration files (use safe_load for security)
+pyyaml>=6.0

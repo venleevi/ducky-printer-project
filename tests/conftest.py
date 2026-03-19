@@ -96,3 +96,19 @@ def temp_test_file(tmp_path, sample_text_content):
     test_file = tmp_path / "test_receipt.txt"
     test_file.write_text(sample_text_content, encoding='utf-8')
     return test_file
+
+
+@pytest.fixture
+def tmp_config_dir(tmp_path):
+    """Creates temporary directory for config source_folder tests.
+
+    Provides a clean temporary directory that exists for testing
+    source_folder path validation.
+
+    Args:
+        tmp_path: Pytest fixture providing temporary directory
+
+    Returns:
+        Path: Path object to the temporary directory
+    """
+    return tmp_path
