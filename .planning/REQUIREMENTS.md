@@ -23,7 +23,7 @@ Requirements for GPIO Print Trigger milestone. Each maps to roadmap phases.
 - [ ] **GPIO-02**: Flipping a switch triggers printing based on configured transition direction
 - [ ] **GPIO-03**: Rapid button presses within cooldown period result in only one print
 - [ ] **GPIO-04**: Hardware debounce prevents false triggers from electrical noise
-- [ ] **GPIO-05**: Printer failure logs error but does not crash the listener service
+- [x] **GPIO-05**: Printer failure logs error but does not crash the listener service
 
 ### File Selection
 
@@ -78,7 +78,7 @@ Requirements for GPIO Print Trigger milestone. Each maps to roadmap phases.
 | GPIO-02 | Phase 5 | Pending |
 | GPIO-03 | Phase 5 | Pending |
 | GPIO-04 | Phase 5 | Pending |
-| GPIO-05 | Phase 4 | Pending |
+| GPIO-05 | Phase 4 | Complete |
 | FILE-01 | Phase 3 | Complete |
 | FILE-02 | Phase 3 | Complete |
 | FILE-03 | Phase 3 | Complete |
