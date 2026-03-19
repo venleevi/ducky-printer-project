@@ -159,7 +159,7 @@ def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer
     return print_text(content)
 
 
-def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = None, target_height_cm: float = None) -> int:
+def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0) -> int:
     """Print image file with per-job connection lifecycle.
 
     Opens connection, prints image centered on receipt paper, then closes.
@@ -214,6 +214,13 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
         # Open connection for this print job
         printer.open()
 
+        # Reset printer and set line spacing to 0 to eliminate padding
+        try:
+            printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
+            printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
+        except:
+            pass  # Ignore if not supported
+
         # Handle image transformations if requested
         actual_image_path = image_path
         if target_width_cm or target_height_cm or fit_width or scale_percent != 100 or rotate:
@@ -232,13 +239,6 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
 
                 # Scale image to fit within target dimensions while maintaining aspect ratio
                 img.thumbnail((target_width_px, target_height_px), Image.LANCZOS)
-
-                # Center image on white canvas with target dimensions
-                canvas = Image.new('RGB', (target_width_px, target_height_px), 'white')
-                x_offset = (target_width_px - img.width) // 2
-                y_offset = (target_height_px - img.height) // 2
-                canvas.paste(img, (x_offset, y_offset))
-                img = canvas
 
             elif fit_width:
                 # Automatically scale to fit printer width while maintaining aspect ratio
@@ -260,9 +260,9 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
             actual_image_path = str(temp_path)
 
         # Print image (python-escpos handles scaling and dithering)
-        # center=True centers image horizontally on paper width
+        # center=False to avoid any centering padding
         # impl="bitImageColumn" is most compatible with thermal printers
-        printer.image(actual_image_path, center=True, impl="bitImageColumn")
+        printer.image(actual_image_path, center=False, impl="bitImageColumn")
 
         # Full paper cut (no spacing)
         printer.cut(mode='FULL')
@@ -290,7 +290,7 @@ def print_image(image_path: str, rotate: bool = False, scale_percent: int = 100,
             pass  # Ignore errors on close
 
 
-def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = False, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = None, target_height_cm: float = None) -> int:
+def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0) -> int:
     """Print file (text or image) based on file extension.
 
     Auto-detects file type by extension and routes to appropriate print function:
