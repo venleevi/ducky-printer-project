@@ -46,11 +46,11 @@
   2. System starts with sensible defaults when config values are omitted
   3. System refuses to start and prints a clear error message when config contains invalid values (bad pin number, negative cooldown, nonexistent mode)
   4. System picks up config file changes without requiring a service restart
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Config schema (Pydantic dataclass) and YAML loader with validation and error formatting
+- [ ] 02-02-PLAN.md — Config file hot-reload with watchdog and debouncing
 
 ### Phase 3: File Selection
 **Goal**: System can pick a random printable file from any configured folder
@@ -108,12 +108,12 @@ Plans:
 
 ## Progress
 
-**Execution Order:** 2 → 3 → 4 → 5 → 6
+**Execution Order:** 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
-| 2. Configuration Foundation | v0.2 | 0/? | Not started | - |
+| 2. Configuration Foundation | v0.2 | 0/2 | Planned | - |
 | 3. File Selection | v0.2 | 0/? | Not started | - |
 | 4. Trigger Handler | v0.2 | 0/? | Not started | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
@@ -122,4 +122,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-19 (v0.2 roadmap created — 5 phases, 19 requirements mapped)*
+*Last updated: 2026-03-19 (Phase 2 planned — 2 plans, 2 waves)*
