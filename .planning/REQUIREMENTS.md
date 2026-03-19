@@ -1,123 +1,97 @@
-# Requirements: Thermal Printer - User Triggers
+# Requirements: Ducky Thermal Printer
 
-**Defined:** 2026-03-13
-**Core Value:** Users can trigger thermal printing via physical button or web interface without manual command execution
+**Defined:** 2026-03-19
+**Core Value:** User presses a physical button and a random file prints on the thermal printer
 
 ## v0.2 Requirements
 
-Requirements for user-triggered printing mechanisms. Each maps to roadmap phases.
+Requirements for GPIO Print Trigger milestone. Each maps to roadmap phases.
 
-### Configuration System
+### Configuration
 
-- [ ] **CFG-01**: System reads configuration from YAML file
-- [ ] **CFG-02**: Configuration specifies whether GPIO trigger is enabled
-- [ ] **CFG-03**: Configuration specifies whether web trigger is enabled
-- [ ] **CFG-04**: Configuration specifies target file path (wish1.png)
-- [ ] **CFG-05**: Configuration specifies GPIO pin number for button
+- [ ] **CFG-01**: User can specify GPIO pin number in YAML config file
+- [ ] **CFG-02**: User can set trigger mode (press or switch) in config file
+- [ ] **CFG-03**: User can set cooldown duration between activations in config file
+- [ ] **CFG-04**: User can set source folder path for print files in config file
+- [ ] **CFG-05**: User can set switch trigger direction (both/on_only/off_only) in config file
+- [ ] **CFG-06**: System validates config at startup and shows clear error messages for invalid values
+- [ ] **CFG-07**: System re-reads config file when it changes without restarting the service
 
-### GPIO Button Trigger
+### GPIO Trigger
 
-- [ ] **GPIO-01**: Physical button press triggers print of wish1.png
-- [ ] **GPIO-02**: Button uses software debouncing to prevent double-press
-- [ ] **GPIO-03**: Button applies cooldown period (2s) after successful print
-- [ ] **GPIO-04**: GPIO listener runs as systemd service with auto-start
-- [ ] **GPIO-05**: GPIO listener handles printer offline errors gracefully
-- [ ] **GPIO-06**: GPIO listener respects enable/disable config setting
+- [ ] **GPIO-01**: Pressing a button triggers printing a random file from the source folder
+- [ ] **GPIO-02**: Flipping a switch triggers printing based on configured transition direction
+- [ ] **GPIO-03**: Rapid button presses within cooldown period result in only one print
+- [ ] **GPIO-04**: Hardware debounce prevents false triggers from electrical noise
+- [ ] **GPIO-05**: Printer failure logs error but does not crash the listener service
 
-### Web Interface Trigger
+### File Selection
 
-- [ ] **WEB-01**: Web page displays single "Print" button
-- [ ] **WEB-02**: Button click sends POST request to trigger print
-- [ ] **WEB-03**: Button shows loading state during print operation
-- [ ] **WEB-04**: Web page displays success/failure message after print
-- [ ] **WEB-05**: Web interface is mobile-responsive (large touch targets)
-- [ ] **WEB-06**: Web server runs as systemd service with auto-start
-- [ ] **WEB-07**: Web server uses production WSGI server (Waitress)
-- [ ] **WEB-08**: Web server respects enable/disable config setting
+- [ ] **FILE-01**: System picks a random file from the configured source folder on each activation
+- [ ] **FILE-02**: System filters to supported file types (.txt, .png, .jpg, .bmp)
+- [ ] **FILE-03**: Empty source folder logs warning instead of crashing
 
-### Network Access
+### Deployment
 
-- [ ] **NET-01**: Web server listens on all network interfaces (0.0.0.0)
-- [ ] **NET-02**: Web interface is accessible from devices on same network as Pi
-- [ ] **NET-03**: System provides way to display/discover Pi's IP address
+- [ ] **DEPLOY-01**: GPIO listener runs as a systemd service that starts on boot
+- [ ] **DEPLOY-02**: Service restarts automatically on crash
+- [ ] **DEPLOY-03**: Service logs to journald for debugging
+- [ ] **DEPLOY-04**: usblp kernel module is blacklisted to prevent USB printer conflicts
 
-### Shared Print Handler
+## Future Requirements
 
-- [ ] **PRINT-01**: Shared handler accepts print requests from GPIO and web triggers
-- [ ] **PRINT-02**: Handler implements thread safety for concurrent access
-- [ ] **PRINT-03**: Handler calls existing v0.1 printer.print_file() function
-- [ ] **PRINT-04**: Handler returns success/failure status to caller
-- [ ] **PRINT-05**: Handler maintains v0.1's per-job connection lifecycle
+### Web Interface (deferred to v0.3+)
 
-## Future Requirements (v0.3+)
+- **WEB-01**: User can trigger print from web browser
+- **WEB-02**: Web interface shows print status feedback
+- **WEB-03**: Web server runs as systemd service
 
-Deferred to future releases. Tracked but not in current roadmap.
+### WiFi Access Point (deferred to v0.3+)
 
-### Multi-File Support
-
-- **FILE-01**: Web interface shows list of available files in folder
-- **FILE-02**: User can select which file to print from web UI
-- **FILE-03**: GPIO button cycles through multiple files
-
-### Advanced Features
-
-- **ADV-01**: Real-time print preview on web interface
-- **ADV-02**: Print queue showing pending/completed jobs
-- **ADV-03**: Authentication for web interface access
-- **ADV-04**: Configuration web panel for editing settings
-- **ADV-05**: Multiple GPIO buttons for different files
+- **WIFI-01**: Pi creates WiFi access point for direct device connection
+- **WIFI-02**: Captive portal redirects to print interface
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| WiFi Access Point hosting | Pi connects to existing network as client; no need to host its own AP |
-| Authentication for web interface | Trusted network environment; authentication adds complexity for single-user device |
-| Real-time printer status polling | Thermal printers are simple devices; status checking adds complexity without clear benefit |
-| Cloud connectivity | POC is standalone device; cloud adds infrastructure dependencies |
-| Mobile app (native) | Web interface adequate for mobile access; native app adds development overhead |
-| Bluetooth connectivity | WiFi AP provides sufficient wireless access; Bluetooth adds protocol complexity |
-| Multiple concurrent prints | Thermal printer is serial device; queuing adds unnecessary complexity for single-user scenario |
+| Multiple printer support | Single Citizen CT-S310IIEBK only for now |
+| File upload/management | Uses existing files in source folder |
+| Print queue | Single print per activation, cooldown handles rapid triggers |
+| Config GUI | YAML file editing is sufficient for Pi users |
+| Remote monitoring | journald logs accessible via SSH |
+| Cloud connectivity | Standalone device, no cloud dependencies |
+| Mobile app | Web interface (future) adequate for mobile |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | Phase 2 | Pending |
-| CFG-02 | Phase 2 | Pending |
-| CFG-03 | Phase 2 | Pending |
-| CFG-04 | Phase 2 | Pending |
-| CFG-05 | Phase 2 | Pending |
-| PRINT-01 | Phase 3 | Pending |
-| PRINT-02 | Phase 3 | Pending |
-| PRINT-03 | Phase 3 | Pending |
-| PRINT-04 | Phase 3 | Pending |
-| PRINT-05 | Phase 3 | Pending |
-| GPIO-01 | Phase 4 | Pending |
-| GPIO-02 | Phase 4 | Pending |
-| GPIO-03 | Phase 4 | Pending |
-| GPIO-04 | Phase 4 | Pending |
-| GPIO-05 | Phase 4 | Pending |
-| GPIO-06 | Phase 4 | Pending |
-| WEB-01 | Phase 5 | Pending |
-| WEB-02 | Phase 5 | Pending |
-| WEB-03 | Phase 5 | Pending |
-| WEB-04 | Phase 5 | Pending |
-| WEB-05 | Phase 5 | Pending |
-| WEB-06 | Phase 5 | Pending |
-| WEB-07 | Phase 5 | Pending |
-| WEB-08 | Phase 5 | Pending |
-| NET-01 | Phase 6 | Pending |
-| NET-02 | Phase 6 | Pending |
-| NET-03 | Phase 6 | Pending |
+| CFG-01 | TBD | Pending |
+| CFG-02 | TBD | Pending |
+| CFG-03 | TBD | Pending |
+| CFG-04 | TBD | Pending |
+| CFG-05 | TBD | Pending |
+| CFG-06 | TBD | Pending |
+| CFG-07 | TBD | Pending |
+| GPIO-01 | TBD | Pending |
+| GPIO-02 | TBD | Pending |
+| GPIO-03 | TBD | Pending |
+| GPIO-04 | TBD | Pending |
+| GPIO-05 | TBD | Pending |
+| FILE-01 | TBD | Pending |
+| FILE-02 | TBD | Pending |
+| FILE-03 | TBD | Pending |
+| DEPLOY-01 | TBD | Pending |
+| DEPLOY-02 | TBD | Pending |
+| DEPLOY-03 | TBD | Pending |
+| DEPLOY-04 | TBD | Pending |
 
 **Coverage:**
-- v0.2 requirements: 27 total
-- Mapped to phases: 27 (100%)
-- Unmapped: 0 ✓
+- v0.2 requirements: 19 total
+- Mapped to phases: 0
+- Unmapped: 19 ⚠️
 
 ---
-*Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after roadmap creation*
+*Requirements defined: 2026-03-19*
+*Last updated: 2026-03-19 after initial definition*
