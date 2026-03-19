@@ -106,24 +106,8 @@ def print_text(content: str) -> int:
         # Open connection for this print job
         printer.open()
 
-        # Minimize vertical spacing
-        try:
-            printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
-            printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
-            printer._raw(b'\x1B\x32')  # ESC 2 - Set line feed to 1/6 inch
-            printer._raw(b'\x1D\x4C\x00\x00')  # GS L - Set left margin to 0
-            printer._raw(b'\x1B\x4A\x00')  # ESC J n - No additional top feed
-        except:
-            pass
-
         # Print content (python-escpos handles UTF-8 encoding)
         printer.text(content)
-
-        # Minimize bottom margin before cut
-        try:
-            printer._raw(b'\x1B\x64\x01')  # ESC d n - Feed 1 line minimum
-        except:
-            pass
 
         # Full paper cut (no spacing)
         printer.cut(mode='FULL')
@@ -230,28 +214,12 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
         # Open connection for this print job
         printer.open()
 
-        # Reset printer and minimize vertical spacing (top/bottom margins)
-        # Note: Hardware default top margin is 11mm (MSW8-3 setting on CT-S310II)
-        # These commands reduce software-controlled spacing, but hardware minimum
-        # top margin is ~1mm (requires MSW8-3 reconfiguration via memory switches)
+        # Reset printer and set line spacing to 0 to eliminate padding
         try:
-            # ESC @ - Initialize printer (reset to default state)
-            printer._raw(b'\x1B\x40')
-
-            # ESC 3 n - Set line spacing to minimum (0 = no line spacing)
-            printer._raw(b'\x1B\x33\x00')
-
-            # ESC 2 - Set line feed to 1/6 inch (reduces default spacing)
-            printer._raw(b'\x1B\x32')
-
-            # GS L nL nH - Set left margin to 0 (no left margin)
-            printer._raw(b'\x1D\x4C\x00\x00')
-
-            # ESC J n - Print and feed paper (0 = no additional top feed)
-            # This reduces top margin in software but hardware MSW8-3 still applies
-            printer._raw(b'\x1B\x4A\x00')
+            printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
+            printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
         except:
-            pass  # Ignore if commands not supported
+            pass  # Ignore if not supported
 
         # Handle image transformations if requested
         actual_image_path = image_path
@@ -295,14 +263,6 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
         # center=False to avoid any centering padding
         # impl="bitImageColumn" is most compatible with thermal printers
         printer.image(actual_image_path, center=False, impl="bitImageColumn")
-
-        # Minimize bottom margin before cut
-        # Note: Bottom margin is primarily hardware-limited by cutter position (~13-15mm)
-        try:
-            # ESC d n - Feed minimal lines (1 line to ensure paper reaches cutter)
-            printer._raw(b'\x1B\x64\x01')
-        except:
-            pass
 
         # Full paper cut (no spacing)
         printer.cut(mode='FULL')
