@@ -7,6 +7,7 @@ Type=simple
 User=admin
 WorkingDirectory=/home/admin/ducky-printer-project
 Environment="PATH=/home/admin/ducky-printer-project/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
 ExecStart=/home/admin/ducky-printer-project/venv/bin/python3 /home/admin/ducky-printer-project/main.py
 Restart=always
 RestartSec=3

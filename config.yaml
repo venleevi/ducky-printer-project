@@ -1,0 +1,23 @@
+# Ducky Printer Configuration
+# Copy to config.yaml and edit as needed.
+# All values shown are defaults — omit any line to use the default.
+
+# GPIO pin number (BCM numbering, 2-27)
+# Avoid reserved pins: 0-1 (I2C), 14-15 (UART)
+gpio_pin: 17
+
+# Trigger mode: "press" (momentary button) or "switch" (toggle switch)
+trigger_mode: press
+
+# Minimum seconds between print activations (0 = no cooldown)
+cooldown_seconds: 5.0
+
+# Folder containing files to print (.txt, .png, .jpg, .bmp)
+source_folder: print_files
+
+# Switch trigger direction: "both", "on_only", or "off_only"
+# Only used when trigger_mode is "switch"
+# - "both": triggers on both ON and OFF transitions
+# - "on_only": triggers only when switch turns ON
+# - "off_only": triggers only when switch turns OFF
+switch_direction: both

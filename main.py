@@ -33,7 +33,7 @@ def signal_handler(signum, frame):
 
     if gpio_observer:
         logger.info("Stopping GPIO listener...")
-        gpio_observer.stop()
+        gpio_observer.close()
 
     if config_observer:
         logger.info("Stopping config watcher...")
@@ -82,7 +82,7 @@ def main():
 
             # Stop old GPIO listener
             if gpio_observer:
-                gpio_observer.stop()
+                gpio_observer.close()
 
             # Start new GPIO listener with updated config
             gpio_observer = start_gpio_listener(new_config)

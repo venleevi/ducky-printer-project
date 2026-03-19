@@ -214,10 +214,11 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
         # Open connection for this print job
         printer.open()
 
-        # Reset printer and set line spacing to 0 to eliminate padding
+        # Reset printer and eliminate vertical spacing (top/bottom margins)
         try:
             printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
             printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
+            printer._raw(b'\x1B\x4A\x00')  # ESC J n - Feed n/360 inches before print (0 = no top margin)
         except:
             pass  # Ignore if not supported
 
