@@ -60,7 +60,7 @@ Plans:
   1. Each activation selects a random file from the configured source folder
   2. Only supported file types (.txt, .png, .jpg, .jpeg, .bmp) are considered for selection
   3. Empty source folder or folder with no supported files logs a warning instead of crashing
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Random file selector with pathlib filtering, case-insensitive extension matching, and graceful empty folder handling (COMPLETE)
@@ -114,7 +114,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
 | 2. Configuration Foundation | v0.2 | 2/2 | Complete | 2026-03-19 |
-| 3. File Selection | v0.2 | 1/1 | Complete | 2026-03-19 |
+| 3. File Selection | v0.2 | Complete    | 2026-03-19 | 2026-03-19 |
 | 4. Trigger Handler | v0.2 | 0/? | Not started | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
 | 6. Service Deployment | v0.2 | 0/? | Not started | - |
