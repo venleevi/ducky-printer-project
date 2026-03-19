@@ -31,7 +31,7 @@
 
 - [x] **Phase 2: Configuration Foundation** - YAML config system with validation, defaults, and hot-reload (COMPLETE 2026-03-19)
 - [x] **Phase 3: File Selection** - Random file picker from configurable source folder with type filtering (COMPLETE 2026-03-19)
-- [ ] **Phase 4: Trigger Handler** - Integration seam between event sources and print pipeline with error resilience
+- [x] **Phase 4: Trigger Handler** - Integration seam between event sources and print pipeline with error resilience (completed 2026-03-19)
 - [ ] **Phase 5: GPIO Listener** - Button and switch mode GPIO input with debounce and cooldown
 - [ ] **Phase 6: Service Deployment** - systemd service, usblp blacklist, journald logging
 
@@ -115,7 +115,7 @@ Plans:
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
 | 2. Configuration Foundation | v0.2 | 2/2 | Complete | 2026-03-19 |
 | 3. File Selection | v0.2 | Complete    | 2026-03-19 | 2026-03-19 |
-| 4. Trigger Handler | v0.2 | 0/1 | Not started | - |
+| 4. Trigger Handler | v0.2 | Complete    | 2026-03-19 | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
 | 6. Service Deployment | v0.2 | 0/? | Not started | - |
 
