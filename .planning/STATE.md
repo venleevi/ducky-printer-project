@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
+milestone: v0.2
+milestone_name: GPIO Print Trigger
 current_phase: null
 current_plan: null
-status: awaiting_milestone
-stopped_at: v0.2 phases removed, new milestone pending
+status: defining_requirements
+stopped_at: Milestone v0.2 started, defining requirements
 last_updated: "2026-03-19T00:00:00.000Z"
 progress:
   total_phases: 0
@@ -19,16 +19,17 @@ progress:
 
 ## Project Reference
 
-**Core Value**: Thermal printer utility for Raspberry Pi with USB-connected Citizen CT-S310IIEBK
+**Core Value**: User presses a physical button and a random file prints on the thermal printer
 
-**Current Focus**: Awaiting new milestone definition
+**Current Focus**: v0.2 GPIO Print Trigger — YAML config, GPIO listener, random file print, systemd service
 
 ## Current Position
 
-**Milestone:** None (v0.2 removed)
-**Phase:** None
-**Status:** Awaiting new milestone
-**Last activity:** 2026-03-19 — Cleared v0.2 phases, preparing for new milestone
+**Milestone:** v0.2 GPIO Print Trigger
+**Phase:** Not started (defining requirements)
+**Plan:** —
+**Status:** Defining requirements
+**Last activity:** 2026-03-19 — Milestone v0.2 started
 
 ## Completed Milestones
 
@@ -41,28 +42,16 @@ progress:
 
 ## Recent Decisions
 
+### v0.2 Scope (2026-03-19)
+- GPIO-only focus (web interface deferred)
+- YAML config format
+- Random file from configurable folder
+- Button press + switch mode with configurable transitions
+- 5s configurable cooldown
+- systemd service for auto-start
+
 ### v0.2 Removal (2026-03-19)
-- All v0.2 phases (2-6) removed — user decided on completely new milestone direction
-
-### v0.1 Hardware Verification (01-04)
-- Extended print script to support PNG/JPG/BMP images alongside text files
-- Explicitly configured USB endpoints (in_ep=0x81, out_ep=0x02) for Citizen CT-S310IIEBK
-- Changed feed() to ln() for line feeds with python-escpos Usb class
-
-### v0.1 CLI Integration (01-03)
-- Use standard Unix exit codes: 0 (success), 1 (error), 2 (bad args), 130 (interrupted)
-- Print all errors to stderr, success messages to stdout
-- Optional --verbose flag for success confirmation
-
-### v0.1 Printer Communication (01-02)
-- Use per-job connection lifecycle (open-print-close) instead of persistent connection
-- USB auto-detection via device class 7 (printer) matching without hard-coded IDs
-- Add pyusb explicitly to requirements.txt for proper dependency chain
-
-### v0.1 Foundation Setup (01-01)
-- Base folder path of /GEN26_BILLPRINTER/ (matches USB stick auto-mount location)
-- UTF-8 text encoding for international character support
-- Separate file_handler module for file operations (single responsibility principle)
+- Original v0.2 phases (2-6) removed — replaced with focused GPIO-only milestone
 
 ## Performance Metrics
 
@@ -81,9 +70,15 @@ progress:
 
 ## Session Continuity
 
-**Next Action**: Execute `/gsd:new-milestone` to define new milestone
+**Next Action**: Define requirements and create roadmap
+
+**Key Constraints**:
+- Must run on Raspberry Pi 3B+ (ARM architecture)
+- Python-based solution
+- Existing v0.1 code must not be modified (additive integration only)
+- Per-job USB connection lifecycle must be maintained
 
 ---
 
 *State initialized: 2026-03-13*
-*Last updated: 2026-03-19 after v0.2 removal*
+*Last updated: 2026-03-19 after v0.2 milestone start*

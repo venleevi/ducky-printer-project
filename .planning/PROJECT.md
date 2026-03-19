@@ -4,63 +4,77 @@
 **Printer:** Citizen CT-S310IIEBK (USB)
 **Language:** Python
 
-## Current State
+## What This Is
 
-**Version:** v0.1.0 (POC) — shipped 2026-03-13
+A Raspberry Pi-based thermal printing system that prints files from a USB-connected Citizen CT-S310IIEBK printer. Users trigger prints via physical GPIO button or switch, printing a random file from a configurable folder. Runs as a systemd service on boot.
 
-**What's Built:**
-- Command-line print script for text and image files
-- USB thermal printer auto-detection and communication
-- File reading from USB stick folder (`/GEN26_BILLPRINTER/`)
-- Hardware-verified with Citizen CT-S310IIEBK printer
+## Core Value
 
-**Tech Stack:**
-- Python 3.13 with python-escpos library
-- 969 lines of code (src + tests)
-- 23 automated tests (100% passing)
-- USB class 7 detection for printer portability
+User presses a physical button (or flips a switch) and a random file prints on the thermal printer — no screen, keyboard, or SSH required.
 
-**Known Issues:**
-- 3/23 tests have mock mismatches (feed vs ln) — functionality works, tests need updating
+## Requirements
 
-## Vision
+### Validated
 
-Proof of concept for automated thermal receipt printing from files stored on a USB stick. The system should detect print jobs in the `/GEN26_BILLPRINTER/` folder and print them on demand using the connected thermal printer.
+- ✓ USB thermal printer communication with auto-detection — v0.1
+- ✓ Text file printing (.txt) with UTF-8 support — v0.1
+- ✓ Image file printing (.png, .jpg, .bmp) — v0.1
+- ✓ CLI print interface (`python3 -m src.print_job <filename>`) — v0.1
+- ✓ Error handling with proper exit codes — v0.1
 
-## Success Criteria
+### Active
 
-### Validated (v0.1.0)
+- [ ] YAML configuration system (GPIO pin, mode, cooldown, source path)
+- [ ] GPIO button press triggers random file print
+- [ ] GPIO switch mode with configurable transition triggers (both/on_only/off_only)
+- [ ] Configurable cooldown between activations (default 5s)
+- [ ] Random file selection from configurable source folder
+- [ ] systemd service for auto-start on boot
 
-- ✅ Successfully communicate with Citizen CT-S310IIEBK via USB — verified with real hardware
-- ✅ Read files from USB stick folder `/GEN26_BILLPRINTER/` — supports text (.txt) and images (.png, .jpg, .bmp)
-- ✅ Print file contents to thermal printer — UTF-8 text and images both working
-- ✅ Handle basic error cases (printer offline, no files, etc.) — clear error messages, proper exit codes
+### Out of Scope
 
-### Active (v0.2)
+- Web interface — deferred to future milestone
+- WiFi access point configuration — deferred to future milestone
+- Multiple printer support — single printer only
+- File upload or management — uses existing files in source folder
 
-Currently building:
-- [ ] Physical button trigger for printing (GPIO-based)
-- [ ] Web interface trigger via WiFi-hosted page
-- [ ] Raspberry Pi WiFi access point configuration
-- [ ] Configuration system to enable/disable triggers
-- [ ] Hardcoded printing of wish1.png file
+## Context
 
-## Key Decisions
-
-| Decision | Rationale | Outcome | Status |
-|----------|-----------|---------|--------|
-| USB class 7 detection instead of vendor/product IDs | Works across multiple printer models | Citizen CT-S310IIEBK detected successfully | ✓ Good |
-| Per-job connection lifecycle (open-print-close) | Prevents device busy errors after power cycles | No connection issues observed | ✓ Good |
-| Extended to support images (PNG/JPG/BMP) | Real USB folder contained image files needing printing | Both text and images print successfully | ✓ Good |
-| Explicit USB endpoints (in_ep=0x81, out_ep=0x02) | Required for Citizen CT-S310IIEBK compatibility | Fixed "Invalid endpoint address" error | ✓ Good |
-| File type auto-detection by extension | Simple routing for text vs images | Clean separation of concerns | ✓ Good |
+- v0.1 POC shipped 2026-03-13 with CLI-only printing
+- v0.2 was originally scoped with web interface + GPIO + config; descoped to GPIO-only focus
+- Existing `src.print_job` module handles file-to-printer pipeline
+- Per-job USB connection lifecycle (open-print-close) must be maintained
+- RPi.GPIO or gpiozero needed for GPIO access on Pi 3B+
 
 ## Constraints
 
-- Must run on Raspberry Pi 3B+ (ARM architecture)
-- Python-based solution
-- USB connectivity only
+- **Platform**: Raspberry Pi 3B+ (ARM architecture, Debian-based OS)
+- **Language**: Python (existing codebase)
+- **Integration**: Must use existing v0.1 print pipeline without modifying it
+- **Connection**: Per-job USB connection lifecycle must be maintained for thread safety
+- **Dependencies**: Minimize new dependencies (PyYAML for config, GPIO library for hardware)
+
+## Key Decisions
+
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| USB class 7 detection instead of vendor/product IDs | Works across multiple printer models | ✓ Good |
+| Per-job connection lifecycle (open-print-close) | Prevents device busy errors after power cycles | ✓ Good |
+| Extended to support images (PNG/JPG/BMP) | Real USB folder contained image files needing printing | ✓ Good |
+| Explicit USB endpoints (in_ep=0x81, out_ep=0x02) | Required for Citizen CT-S310IIEBK compatibility | ✓ Good |
+| YAML config over JSON/INI | Human-friendly for Pi users editing config on device | — Pending |
+| GPIO trigger only (no web) for v0.2 | Focused scope, ship faster, web deferred | — Pending |
+
+## Current Milestone: v0.2 GPIO Print Trigger
+
+**Goal:** Physical button or switch connected to Raspberry Pi GPIO triggers printing a random file from a configurable folder, running as a systemd service.
+
+**Target features:**
+- YAML configuration system
+- GPIO button/switch listener with configurable mode
+- Random file selection from source folder
+- Cooldown between activations
+- systemd service for auto-start on boot
 
 ---
-
-*Last updated: 2026-03-13 after starting v0.2 milestone*
+*Last updated: 2026-03-19 after starting v0.2 milestone*
