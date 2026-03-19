@@ -19,3 +19,7 @@ pyyaml>=6.0
 
 # Filesystem event monitoring for config hot-reload
 watchdog>=6.0
+
+# GPIO library for Raspberry Pi button/switch integration
+# Note: lgpio backend must be installed via system package (not pip)
+gpiozero>=2.0
