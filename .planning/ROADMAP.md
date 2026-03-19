@@ -29,7 +29,7 @@
 
 **Milestone Goal:** Physical button or switch connected to Raspberry Pi GPIO triggers printing a random file from a configurable folder, running as a systemd service.
 
-- [ ] **Phase 2: Configuration Foundation** - YAML config system with validation, defaults, and hot-reload
+- [x] **Phase 2: Configuration Foundation** - YAML config system with validation, defaults, and hot-reload (COMPLETE 2026-03-19)
 - [ ] **Phase 3: File Selection** - Random file picker from configurable source folder with type filtering
 - [ ] **Phase 4: Trigger Handler** - Integration seam between event sources and print pipeline with error resilience
 - [ ] **Phase 5: GPIO Listener** - Button and switch mode GPIO input with debounce and cooldown
@@ -49,8 +49,8 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Config schema (Pydantic dataclass) and YAML loader with validation and error formatting
-- [ ] 02-02-PLAN.md — Config file hot-reload with watchdog and debouncing
+- [x] 02-01-PLAN.md — Config schema (Pydantic dataclass) and YAML loader with validation and error formatting (COMPLETE)
+- [x] 02-02-PLAN.md — Config file hot-reload with watchdog and debouncing (COMPLETE)
 
 ### Phase 3: File Selection
 **Goal**: System can pick a random printable file from any configured folder
@@ -113,7 +113,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Print files from USB folder | v0.1 | 4/4 | Complete | 2026-03-13 |
-| 2. Configuration Foundation | v0.2 | 0/2 | Planned | - |
+| 2. Configuration Foundation | v0.2 | 2/2 | Complete | 2026-03-19 |
 | 3. File Selection | v0.2 | 0/? | Not started | - |
 | 4. Trigger Handler | v0.2 | 0/? | Not started | - |
 | 5. GPIO Listener | v0.2 | 0/? | Not started | - |
@@ -122,4 +122,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-03-13*
-*Last updated: 2026-03-19 (Phase 2 planned — 2 plans, 2 waves)*
+*Last updated: 2026-03-19 (Phase 2 complete — all plans delivered, 35 tests passing)*
