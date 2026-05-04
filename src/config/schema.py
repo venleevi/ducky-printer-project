@@ -49,6 +49,22 @@ class PrinterConfig:
         description="Which switch transitions trigger printing (both/on_only/off_only)"
     )
 
+    printer_interface: Literal["usb", "serial"] = Field(
+        default="serial",
+        description="Printer connection type: 'usb' (USB class 7) or 'serial' (virtual COM port e.g. /dev/ttyACM0)"
+    )
+
+    serial_port: str = Field(
+        default="/dev/ttyACM0",
+        description="Serial device path (only used when printer_interface is 'serial')"
+    )
+
+    serial_baudrate: int = Field(
+        default=9600,
+        gt=0,
+        description="Serial baud rate (only used when printer_interface is 'serial')"
+    )
+
     @field_validator('gpio_pin')
     @classmethod
     def validate_gpio_pin_not_reserved(cls, v: int) -> int:

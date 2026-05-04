@@ -41,14 +41,14 @@ class TestFindPrinter:
         with pytest.raises(PrinterError) as exc_info:
             find_printer()
 
-        assert "No printer found" in str(exc_info.value)
+        assert "No USB printer found" in str(exc_info.value)
 
 
 class TestPrintText:
     """Tests for print_text() function."""
 
     def test_print_text_executes_correct_sequence(self, mock_printer, mocker):
-        """Test print_text() opens connection, sends text, feeds, cuts, and closes."""
+        """Test print_text() opens connection, sends text, cuts, and closes."""
         mocker.patch('src.printer.find_printer', return_value=mock_printer)
 
         content = "Test receipt content"
@@ -56,7 +56,6 @@ class TestPrintText:
 
         # Verify correct call sequence
         assert mock_printer.open.call_count == 1
-        assert mock_printer.feed.call_count == 2  # 1 before, 2 after
         assert mock_printer.text.call_count == 1
         assert mock_printer.cut.call_count == 1
         assert mock_printer.close.call_count == 1
@@ -64,36 +63,11 @@ class TestPrintText:
         # Verify method arguments
         mock_printer.text.assert_called_with(content)
 
-        # Check feed calls - first with 1, second with 2
-        feed_calls = mock_printer.feed.call_args_list
-        assert feed_calls[0] == call(1)  # 1 blank line before
-        assert feed_calls[1] == call(2)  # 2 blank lines after
-
         # Verify cut mode
         mock_printer.cut.assert_called_with(mode='FULL')
 
         # Should return 0 on success
         assert result == 0
-
-    def test_print_text_adds_one_blank_line_before_content(self, mock_printer, mocker):
-        """Test print_text() feeds 1 blank line before printing content."""
-        mocker.patch('src.printer.find_printer', return_value=mock_printer)
-
-        print_text("Test")
-
-        # First feed call should be with 1 line
-        first_feed_call = mock_printer.feed.call_args_list[0]
-        assert first_feed_call == call(1)
-
-    def test_print_text_adds_two_blank_lines_after_content(self, mock_printer, mocker):
-        """Test print_text() feeds 2 blank lines after printing content."""
-        mocker.patch('src.printer.find_printer', return_value=mock_printer)
-
-        print_text("Test")
-
-        # Second feed call should be with 2 lines
-        second_feed_call = mock_printer.feed.call_args_list[1]
-        assert second_feed_call == call(2)
 
     def test_print_text_closes_connection_on_usb_error(self, mock_printer, mocker):
         """Test print_text() closes connection and raises PrinterError on USB error."""

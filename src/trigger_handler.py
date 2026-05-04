@@ -62,7 +62,10 @@ def handle_print_trigger(config: PrinterConfig) -> bool:
                 base_folder=str(file_path.parent),
                 rotate=True,
                 target_width_cm=8.0,  # Full width
-                target_height_cm=100.0  # Large height = no vertical constraint
+                target_height_cm=100.0,  # Large height = no vertical constraint
+                interface=config.printer_interface,
+                serial_port=config.serial_port,
+                serial_baudrate=config.serial_baudrate
             )
             logger.info(f"Print triggered successfully: {file_path}")
             log_print_event(success=True, file_path=str(file_path))

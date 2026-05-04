@@ -21,3 +21,13 @@ source_folder: print_files
 # - "on_only": triggers only when switch turns ON
 # - "off_only": triggers only when switch turns OFF
 switch_direction: both
+
+# Printer connection type: "usb" (USB class 7, e.g. Citizen CT-S310II)
+# or "serial" (virtual COM port, e.g. PRP-300 on /dev/ttyACM0)
+printer_interface: usb
+
+# Serial port device path (only used when printer_interface is "serial")
+serial_port: /dev/ttyACM0
+
+# Serial baud rate (only used when printer_interface is "serial")
+serial_baudrate: 9600

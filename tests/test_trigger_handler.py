@@ -85,7 +85,10 @@ class TestHandlePrintTriggerSuccess:
                 base_folder=str(test_file.parent),
                 rotate=True,
                 target_width_cm=8.0,
-                target_height_cm=100.0
+                target_height_cm=100.0,
+                interface='serial',
+                serial_port='/dev/ttyACM0',
+                serial_baudrate=9600
             )
 
 

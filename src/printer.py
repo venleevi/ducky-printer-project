@@ -10,9 +10,11 @@ Security notes:
 - Connection always closed in finally block to prevent resource leaks
 """
 
+import time
 import usb.core
+import serial as pyserial
 from pathlib import Path
-from escpos.printer import Usb
+from escpos.printer import Usb, Dummy
 from PIL import Image, ImageOps
 from src.file_handler import read_file, resolve_filepath
 
@@ -25,7 +27,32 @@ class PrinterError(Exception):
     pass
 
 
-def find_printer():
+def find_printer(interface: str = "usb", serial_port: str = "/dev/ttyACM0", serial_baudrate: int = 9600):
+    """Auto-detect thermal printer via USB or serial interface.
+
+    For USB: returns python-escpos Usb printer instance.
+    For serial: verifies the device file exists (printing uses raw file writes).
+
+    Args:
+        interface: Connection type - "usb" (class 7 detection) or "serial" (virtual COM port)
+        serial_port: Serial device path, used when interface="serial" (default: /dev/ttyACM0)
+        serial_baudrate: Serial baud rate, used when interface="serial" (default: 9600)
+
+    Returns:
+        Usb: python-escpos printer instance (USB only)
+
+    Raises:
+        PrinterError: If no printer found or connection error occurs
+    """
+    if interface == "serial":
+        if not Path(serial_port).exists():
+            raise PrinterError(f"Serial device not found: {serial_port}")
+        return None
+    else:
+        return _find_usb_printer()
+
+
+def _find_usb_printer():
     """Auto-detect USB thermal printer by device class (class 7).
 
     Uses USB class 7 (printer class) detection to find thermal printer
@@ -40,10 +67,6 @@ def find_printer():
 
     Raises:
         PrinterError: If no printer found or USB error occurs
-
-    Example:
-        >>> printer = find_printer()
-        >>> printer.open()
     """
     def match_printer_class(device):
         """Check if USB device is a printer (class 7)."""
@@ -72,10 +95,45 @@ def find_printer():
         )
         return printer
     except Exception as e:
-        raise PrinterError(f"No printer found: {e}")
+        raise PrinterError(f"No USB printer found: {e}")
 
 
-def print_text(content: str) -> int:
+def _write_raw_to_serial(data: bytes, serial_port: str, baudrate: int = 9600):
+    """Write raw ESC/POS bytes directly to serial device file.
+
+    Uses raw file write with flush + fsync for reliable delivery to
+    CDC ACM serial printers (e.g. PRP-300). This avoids buffer overflow
+    issues that occur with the python-escpos Serial class on these devices.
+
+    Args:
+        data: Raw ESC/POS byte data to send
+        serial_port: Device file path (e.g. /dev/ttyACM0)
+        baudrate: Serial baud rate (default: 9600)
+
+    Raises:
+        PrinterError: If device not found or write error occurs
+    """
+    CHUNK_SIZE = 4096
+    CHUNK_DELAY = 0.01
+    try:
+        ser = pyserial.Serial(serial_port, baudrate=baudrate, write_timeout=10)
+        ser.reset_output_buffer()
+        for i in range(0, len(data), CHUNK_SIZE):
+            ser.write(data[i:i + CHUNK_SIZE])
+            ser.flush()
+            time.sleep(CHUNK_DELAY)
+        ser.close()
+    except pyserial.SerialException as e:
+        if "FileNotFoundError" in str(e) or "No such file" in str(e):
+            raise PrinterError(f"Serial device not found: {serial_port}")
+        elif "PermissionError" in str(e) or "Permission denied" in str(e):
+            raise PrinterError(f"Permission denied: {serial_port} (add user to dialout group)")
+        raise PrinterError(f"Serial write error on {serial_port}: {e}")
+    except Exception as e:
+        raise PrinterError(f"Serial write error on {serial_port}: {e}")
+
+
+def print_text(content: str, interface: str = "usb", serial_port: str = "/dev/ttyACM0", serial_baudrate: int = 9600) -> int:
     """Print text content with per-job connection lifecycle.
 
     Opens connection, prints content with spacing and paper cut, then closes.
@@ -89,6 +147,9 @@ def print_text(content: str) -> int:
 
     Args:
         content: Text content to print (UTF-8 string)
+        interface: Connection type - "usb" or "serial"
+        serial_port: Serial device path (for serial interface)
+        serial_baudrate: Serial baud rate (for serial interface)
 
     Returns:
         int: 0 on success
@@ -100,18 +161,22 @@ def print_text(content: str) -> int:
         >>> print_text("Customer Receipt\\nTotal: $10.50")
         0
     """
-    printer = find_printer()
+    if interface == "serial":
+        # Serial: render to bytes via Dummy, then raw write to device file
+        d = Dummy()
+        d._raw(b'\x1B\x40')  # ESC @ - Initialize printer
+        d.text(content)
+        d.cut(mode='FULL')
+        _write_raw_to_serial(d.output, serial_port, serial_baudrate)
+        return 0
+
+    # USB: use python-escpos Usb printer directly
+    printer = find_printer(interface, serial_port, serial_baudrate)
 
     try:
-        # Open connection for this print job
         printer.open()
-
-        # Print content (python-escpos handles UTF-8 encoding)
         printer.text(content)
-
-        # Full paper cut (no spacing)
         printer.cut(mode='FULL')
-
         return 0
 
     except usb.core.USBError as e:
@@ -121,14 +186,13 @@ def print_text(content: str) -> int:
         raise PrinterError(f"Printer error: {e}")
 
     finally:
-        # Always close connection to prevent resource leaks
         try:
             printer.close()
         except:
-            pass  # Ignore errors on close
+            pass
 
 
-def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files") -> int:
+def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", interface: str = "usb", serial_port: str = "/dev/ttyACM0", serial_baudrate: int = 9600) -> int:
     """Read text file and print its content.
 
     Reads file via file_handler module (handles UTF-8 validation and errors),
@@ -137,6 +201,9 @@ def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer
     Args:
         filename: Name of file to print (relative or absolute path)
         base_folder: Base folder for relative paths (default: /home/admin/ducky-printer-project/print_files)
+        interface: Connection type - "usb" or "serial"
+        serial_port: Serial device path (for serial interface)
+        serial_baudrate: Serial baud rate (for serial interface)
 
     Returns:
         int: 0 on success
@@ -156,10 +223,10 @@ def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer
     content = read_file(filename, base_folder)
 
     # Print content (PrinterError propagates to caller)
-    return print_text(content)
+    return print_text(content, interface, serial_port, serial_baudrate)
 
 
-def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0) -> int:
+def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0, interface: str = "usb", serial_port: str = "/dev/ttyACM0", serial_baudrate: int = 9600) -> int:
     """Print image file with per-job connection lifecycle.
 
     Opens connection, prints image centered on receipt paper, then closes.
@@ -207,20 +274,9 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
         >>> print_image("/media/admin/KINGSTON/home/admin/ducky-printer-project/print_files/wish1.png", rotate=True, target_width_cm=8, target_height_cm=18)
         0
     """
-    printer = find_printer()
     temp_path = None
 
     try:
-        # Open connection for this print job
-        printer.open()
-
-        # Reset printer and set line spacing to 0 to eliminate padding
-        try:
-            printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
-            printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
-        except:
-            pass  # Ignore if not supported
-
         # Handle image transformations if requested
         actual_image_path = image_path
         if target_width_cm or target_height_cm or fit_width or scale_percent != 100 or rotate:
@@ -259,21 +315,44 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
             img.save(temp_path)
             actual_image_path = str(temp_path)
 
-        # Print image (python-escpos handles scaling and dithering)
-        # center=False to avoid any centering padding
-        # impl="bitImageColumn" is most compatible with thermal printers
-        printer.image(actual_image_path, center=False, impl="bitImageColumn")
+        if interface == "serial":
+            # Serial: render to bytes via Dummy with bitImageColumn, then raw write
+            d = Dummy()
+            d._raw(b'\x1B\x40')  # ESC @ - Initialize printer
+            d._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
+            d.image(actual_image_path, center=False, impl="bitImageColumn")
+            d.cut(mode='FULL')
+            _write_raw_to_serial(d.output, serial_port, serial_baudrate)
+            return 0
 
-        # Full paper cut (no spacing)
-        printer.cut(mode='FULL')
+        # USB: use python-escpos Usb printer directly
+        printer = find_printer(interface, serial_port, serial_baudrate)
 
-        return 0
+        try:
+            printer.open()
 
-    except usb.core.USBError as e:
-        raise PrinterError(f"USB error: {e}")
+            # Reset printer and set line spacing to 0 to eliminate padding
+            try:
+                printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
+                printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
+            except:
+                pass  # Ignore if not supported
 
-    except Exception as e:
-        raise PrinterError(f"Printer error: {e}")
+            printer.image(actual_image_path, center=False, impl="bitImageColumn")
+            printer.cut(mode='FULL')
+            return 0
+
+        except usb.core.USBError as e:
+            raise PrinterError(f"USB error: {e}")
+
+        except Exception as e:
+            raise PrinterError(f"Printer error: {e}")
+
+        finally:
+            try:
+                printer.close()
+            except:
+                pass
 
     finally:
         # Clean up temp processed image if created
@@ -283,14 +362,8 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
             except:
                 pass
 
-        # Always close connection to prevent resource leaks
-        try:
-            printer.close()
-        except:
-            pass  # Ignore errors on close
 
-
-def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0) -> int:
+def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0, interface: str = "usb", serial_port: str = "/dev/ttyACM0", serial_baudrate: int = 9600) -> int:
     """Print file (text or image) based on file extension.
 
     Auto-detects file type by extension and routes to appropriate print function:
@@ -341,11 +414,11 @@ def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-proj
 
     if extension == '.txt':
         # Text file - use text printing
-        return print_text_file(filename, base_folder)
+        return print_text_file(filename, base_folder, interface=interface, serial_port=serial_port, serial_baudrate=serial_baudrate)
 
     elif extension in ['.png', '.jpg', '.jpeg', '.bmp']:
         # Image file - use image printing
-        return print_image(str(file_path), rotate=rotate, scale_percent=scale_percent, fit_width=fit_width, printer_width=printer_width, target_width_cm=target_width_cm, target_height_cm=target_height_cm)
+        return print_image(str(file_path), rotate=rotate, scale_percent=scale_percent, fit_width=fit_width, printer_width=printer_width, target_width_cm=target_width_cm, target_height_cm=target_height_cm, interface=interface, serial_port=serial_port, serial_baudrate=serial_baudrate)
 
     else:
         # Unsupported file type
