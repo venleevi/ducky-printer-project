@@ -61,8 +61,8 @@ def handle_print_trigger(config: PrinterConfig) -> bool:
                 filename=str(file_path),
                 base_folder=str(file_path.parent),
                 rotate=True,
-                target_width_cm=8.0,  # Full width
-                target_height_cm=100.0  # Large height = no vertical constraint
+                target_width_cm=8.0,  # Full paper width (576px)
+                target_height_cm=17.3  # 18cm total with ~0.7cm cut overhead
             )
             logger.info(f"Print triggered successfully: {file_path}")
             log_print_event(success=True, file_path=str(file_path))

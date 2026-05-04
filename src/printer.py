@@ -159,7 +159,7 @@ def print_text_file(filename: str, base_folder: str = "/home/admin/ducky-printer
     return print_text(content)
 
 
-def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0) -> int:
+def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 17.3) -> int:
     """Print image file with per-job connection lifecycle.
 
     Opens connection, prints image centered on receipt paper, then closes.
@@ -231,18 +231,23 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
             if rotate:
                 img = img.rotate(-90, expand=True)  # -90 = clockwise
 
+            # Trim white borders before scaling
+            diff = ImageOps.invert(img.convert('RGB'))
+            bbox = diff.getbbox()
+            if bbox:
+                img = img.crop(bbox)
+
             # Scale image based on target dimensions
             if target_width_cm and target_height_cm:
                 # Convert cm to pixels
                 target_width_px = int(target_width_cm * PIXELS_PER_CM)
                 target_height_px = int(target_height_cm * PIXELS_PER_CM)
 
-                # Scale image to fit within target dimensions while maintaining aspect ratio
-                img.thumbnail((target_width_px, target_height_px), Image.LANCZOS)
+                # Scale image to fill exact target dimensions (may distort)
+                img = img.resize((target_width_px, target_height_px), Image.LANCZOS)
 
             elif fit_width:
                 # Automatically scale to fit printer width while maintaining aspect ratio
-                # Scale both up and down to always fill width (no gaps)
                 scale_factor = printer_width / img.width
                 new_width = printer_width
                 new_height = int(img.height * scale_factor)
@@ -290,7 +295,7 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
             pass  # Ignore errors on close
 
 
-def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 18.0) -> int:
+def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 17.3) -> int:
     """Print file (text or image) based on file extension.
 
     Auto-detects file type by extension and routes to appropriate print function:
