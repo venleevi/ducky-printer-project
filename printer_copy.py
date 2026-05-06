@@ -9,7 +9,7 @@ Security notes:
 - All USB errors are caught and converted to PrinterError
 - Connection always closed in finally block to prevent resource leaks
 """
-
+import time
 import usb.core
 from pathlib import Path
 from escpos.printer import Usb
@@ -209,7 +209,12 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
     """
     printer = find_printer()
     temp_path = None
-
+    #printer_width = 576
+    #target_width_cm=None
+    #target_height_cm=None
+    #fit_width=True
+    print(f"printer width is: {printer_width}")
+    #scale_percent = 50
     try:
         # Open connection for this print job
         printer.open()
@@ -218,6 +223,10 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
         try:
             printer._raw(b'\x1B\x40')  # ESC @ - Initialize printer
             printer._raw(b'\x1B\x33\x00')  # ESC 3 n - Set line spacing to 0
+            printer._raw(b'\x1D\x4C\x00\x00')
+            printer._raw(b'\x1D\x57\x00\x02')
+            printer._raw(b'\x1B\x33\x00')
+            print("Im here")
         except:
             pass  # Ignore if not supported
 
@@ -240,6 +249,9 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
             # Scale image based on target dimensions
             if target_width_cm and target_height_cm:
                 # Convert cm to pixels
+                #target_width_px = int(target_width_cm * PIXELS_PER_CM)
+                #target_height_px = int(target_height_cm * PIXELS_PER_CM)
+
                 target_width_px = int(target_width_cm * PIXELS_PER_CM)
                 target_height_px = int(target_height_cm * PIXELS_PER_CM)
 
@@ -251,7 +263,15 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
                 scale_factor = printer_width / img.width
                 new_width = printer_width
                 new_height = int(img.height * scale_factor)
-                img = img.resize((new_width, new_height), Image.LANCZOS)
+                img = img.resize(
+                (printer_width, int(img.height * scale_factor)),
+                 Image.LANCZOS
+                 )
+                #img = img.resize(
+                #    (new_width, new_height),
+                #    Image.LANCZOS
+                #)
+                
             elif scale_percent != 100:
                 # Manual percentage scaling
                 scale_factor = scale_percent / 100.0
@@ -260,18 +280,24 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
                 img = img.resize((new_width, new_height), Image.LANCZOS)
 
             # Save to temp file with same extension
-            temp_path = Path(image_path).parent / f".temp_processed_{Path(image_path).name}"
+            # temp_path = Path(image_path).parent / f".temp_processed_{Path(image_path).name}"
+            temp_path = "/home/admin/test_image.png"
             img.save(temp_path)
+            print(f"image saved to {temp_path}")
             actual_image_path = str(temp_path)
 
         # Print image (python-escpos handles scaling and dithering)
         # center=False to avoid any centering padding
         # impl="bitImageColumn" is most compatible with thermal printers
-        printer.image(actual_image_path, center=False, impl="bitImageColumn")
-
+        #img = pad_to_width(img, 576)
+        print(f"Final size: {img.size}")
+        printer.image(actual_image_path, center=False, impl="bitImageRaster")
+        #printer.feed(3)
+        #time.sleep(1.0)
         # Full paper cut (no spacing)
-        printer.cut(mode='FULL', feed=True)
-
+        #printer.control(ctl='LF', count=40)
+        printer.cut(mode='FULL', feed=False)
+        #time.sleep(0.5)
         return 0
 
     except usb.core.USBError as e:
@@ -282,11 +308,11 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
 
     finally:
         # Clean up temp processed image if created
-        if temp_path and temp_path.exists():
-            try:
-                temp_path.unlink()
-            except:
-                pass
+        #if temp_path and temp_path.exists():
+        #    try:
+        #        temp_path.unlink()
+        #    except:
+        #        pass
 
         # Always close connection to prevent resource leaks
         try:
@@ -294,6 +320,18 @@ def print_image(image_path: str, rotate: bool = True, scale_percent: int = 100, 
         except:
             pass  # Ignore errors on close
 
+
+
+def pad_to_width(img, target_width=576):
+    if img.width >target_width:
+        raise PrinterError(f"Image too wide: {img.width} px > {target_width} px")
+    if img.width == target_width:
+        return img
+    padded = Image.new(img.mode, (target_width, img.height), "white")
+    
+    padded.paste(img, (0,0))
+    
+    return padded
 
 def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-project/print_files", rotate: bool = True, scale_percent: int = 100, fit_width: bool = False, printer_width: int = 576, target_width_cm: float = 8.0, target_height_cm: float = 17.3) -> int:
     """Print file (text or image) based on file extension.
@@ -335,7 +373,6 @@ def print_file(filename: str, base_folder: str = "/home/admin/ducky-printer-proj
     """
     # Resolve to full path
     file_path = resolve_filepath(filename, base_folder)
-
     # Check file exists
     if not file_path.exists():
         from src.file_handler import FileError
